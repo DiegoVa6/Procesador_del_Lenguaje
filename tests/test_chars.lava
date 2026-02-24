@@ -1,0 +1,27 @@
+// ====== CHARS VÁLIDOS ======
+char a = 'A';
+char b = '0';
+char c = ' ';
+char d = '?';
+char e = '¿';   // ASCII extendido (depende del encoding del fichero, usa UTF-8)
+
+// ====== CHARS CON INDENTACIÓN (para columnas) ======
+    char i = 'Z';
+        char j = 'Y';
+
+// ====== ENTRE COMENTARIOS MULTILÍNEA CON SALTOS ======
+/*
+   comentario con líneas
+   para comprobar line_start
+*/
+char k = 'K';
+
+// ====== CHARS INVÁLIDOS (deben disparar t_BAD_CHAR) ======
+char bad1 = 'AB';
+char bad2 = '123';
+char bad3 = '';
+char bad4 = 'A'B';   // debería romper en el 'A' y luego tokenizar B según tu lexer
+
+// ====== CASOS QUE TU LEXER ACEPTA PERO QUIZÁ NO QUIERES ======
+char weird1 = '\n';  // tu regex actual lo acepta como 1 char: backslash + n (2 chars) -> debería caer en BAD_CHAR
+char weird2 = '\\';  // igual: 2 chars -> BAD_CHAR

@@ -1,9 +1,5 @@
 import sys
-from lexer import lexer
-
-def find_column(data, lexpos):
-    last_nl = data.rfind('\n', 0, lexpos)
-    return lexpos - (last_nl + 1)
+from lexer import Lexer
 
 def main():
     if len(sys.argv) < 2:
@@ -14,17 +10,23 @@ def main():
     with open(in_path, 'r', encoding='utf-8') as f:
         data = f.read()
 
-    lexer.lineno = 1
-    lexer.input(data)
+    lavalexer = Lexer()
+    lavalexer.lexer.lineno = 1
+    lavalexer.lexer.input(data)
 
     out_path = in_path.rsplit('.', 1)[0] + '.token'
 
     with open(out_path, 'w', encoding='utf-8') as out:
-        for tok in iter(lexer.token, None):
-            col_start = find_column(data, tok.lexpos)
-            lexeme = getattr(tok, "raw", tok.value)
-            col_end = col_start + len(str(lexeme))
-            out.write(f"{tok.type}, {lexeme}, {tok.lineno}, {col_start}, {col_end}\n")
+        while True:
+            tok = lavalexer.lexer.token()
+            if not tok:
+                break
+            col_start = tok.lexpos - lavalexer.line_start
+
+            raw = getattr(tok, "raw", None)
+            lexeme_len = len(raw) if raw is not None else len(str(tok.value))
+            col_end = col_start + lexeme_len
+            out.write(f"{tok.type}, {tok.value}, {tok.lineno}, {col_start}, {col_end}\n")
 
 
 if __name__ == "__main__":
