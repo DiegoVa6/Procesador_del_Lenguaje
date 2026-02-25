@@ -21,7 +21,7 @@ class Lexer:
         'WHILE',
         'PRINT',
         'NEW',
-        'RECORD'
+        'RECORD',
         'BREAK'
     ) # Esta correcto
 
@@ -82,7 +82,7 @@ class Lexer:
 
     def t_FLOAT_VALUE(self, t):
         r'(\d+(\.\d+)?e[+-]?\d+)|(\d+\.\d+)'
-        t.raw = t.value
+        t.raw = t.value # guarda lexema original antse de convertirlo a float
         t.value = float(t.value)
         return t
 
@@ -119,7 +119,7 @@ class Lexer:
 
     def t_ID(self, t):
         r'[A-Za-z_][A-Za-z0-9_]*'
-        t.type = self.reserved_map.get(t.value, 'ID')
+        t.type = self.reserved_map.get(t.value, 'ID') #detecta palabras reservadas
         return t
 
     def t_newline(self, t):
