@@ -22,6 +22,7 @@ class Lexer:
         'PRINT',
         'NEW',
         'RECORD'
+        'BREAK'
     ) # Esta correcto
 
     tokens = reserved + (
