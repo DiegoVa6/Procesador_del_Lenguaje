@@ -18,17 +18,14 @@ def main():
 
     with open(out_path, 'w', encoding='utf-8') as out:
         while True:
-            tok = lavalexer.lexer.token()
+            tok = lavalexer.token()
             if not tok:
                 break
-            # columna inicio = posición del token − inicio de su línea
-            col_start = tok.lexpos - lavalexer.line_start
-            # usa raw para longitud real
-            raw = getattr(tok, "raw", None)
-            lexeme_len = len(raw) if raw is not None else len(str(tok.value))
-            col_end = col_start + lexeme_len
-            out.write(f"{tok.type}, {tok.value}, {tok.lineno}, {col_start}, {col_end}\n")
+            
+            # usar columana que ya vienen calculadas en el token
+            out.write(f"{tok.type}, {tok.value}, {tok.lineno}, {tok.col_start}, {tok.col_end}\n")
 
+    print(f"Analisis completo.Tokens generated and saved to {out_path}")
 
 if __name__ == "__main__":
     main()

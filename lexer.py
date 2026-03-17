@@ -70,6 +70,17 @@ class Lexer:
 
     t_ignore = ' \t\r'
 
+    # Sobrescribo el método token para calcular columnas
+    def token(self):
+        tok = self.lexer.token()
+        
+        if tok:
+            raw_lexeme = getattr(tok, 'raw', str(tok.value))
+            tok.col_start = tok.lexpos - self.line_start
+            tok.col_end = tok.col_start + len(raw_lexeme)
+        
+        return tok
+
 
     def t_COMMENT(self, t):
         r'/\*[\s\S]*?\*/|//[^\n]*'
@@ -81,7 +92,7 @@ class Lexer:
         return None
 
     def t_FLOAT_VALUE(self, t):
-        r'(\d+(\.\d+)?e[+-]?\d+)|(\d+\.\d+)'
+        r'(([1-9][0-9]*|0)(\.[0-9]+)?e[+-]?[0-9]+)|((0|[1-9][0-9]*)\.[0-9]+)'
         t.raw = t.value # guarda lexema original antse de convertirlo a float
         t.value = float(t.value)
         return t
@@ -89,7 +100,6 @@ class Lexer:
     def t_INT_VALUE(self, t):
         r'0b[01]+|0x[0-9A-F]+|0[0-7]+|0|[1-9][0-9]*'
         t.raw = t.value  # lexema original
-
         s = t.value
         if s.startswith('0b'):
             t.value = int(s[2:], 2)
@@ -101,14 +111,9 @@ class Lexer:
             t.value = int(s, 10)
 
         return t
-
-    def t_BAD_CHAR(self, t):
-        r"'[^\n']{2,}'"
-        print(f"ERROR: literal char inválido {t.value} en línea {t.lineno}")
-        return None
     
     def t_CHAR_VALUE(self, t):
-        r"'[^\n']'"
+        r"'(?:[^'\\]|\\.)?'"
         t.raw = t.value
         ch = t.value[1]
         if ord(ch) > 255:
@@ -120,6 +125,10 @@ class Lexer:
     def t_ID(self, t):
         r'[A-Za-z_][A-Za-z0-9_]*'
         t.type = self.reserved_map.get(t.value, 'ID') #detecta palabras reservadas
+        if t.type == 'TRUE':
+            t.value = True
+        elif t.type == 'FALSE':
+            t.value = False
         return t
 
     def t_newline(self, t):
@@ -128,5 +137,6 @@ class Lexer:
         self.line_start = t.lexpos + len(t.value)
 
     def t_error(self, t):
-        print(f"Illegal character '{t.value[0]}' at line {t.lineno}")
+        col = t.lexpos - self.line_start
+        print(f"Caracter ilegal '{t.value[0]}' en linea {t.lineno}, columna {col}")
         t.lexer.skip(1)
