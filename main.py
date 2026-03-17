@@ -21,12 +21,9 @@ def main():
             tok = lavalexer.lexer.token()
             if not tok:
                 break
-            # columna inicio = posición del token − inicio de su línea
-            col_start = tok.lexpos - lavalexer.line_start
-            # usa raw para longitud real
-            raw = getattr(tok, "raw", None)
-            lexeme_len = len(raw) if raw is not None else len(str(tok.value))
-            col_end = col_start + lexeme_len
+            # Usar los valores de columna calculados por el lexer
+            col_start = tok.column_start
+            col_end = tok.column_end
             out.write(f"{tok.type}, {tok.value}, {tok.lineno}, {col_start}, {col_end}\n")
 
 

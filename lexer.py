@@ -1,10 +1,11 @@
 import ply.lex as lex
 
-#REGEXP para hacer pruebas
+# Variable global para rastrear la columna total
+total_columns = 0
+
 class Lexer:
     def __init__(self) -> None:
         self.lexer = lex.lex(module=self)
-        self.line_start = 0
 
     reserved = (
         'TRUE',
@@ -48,132 +49,113 @@ class Lexer:
     # Operadores de dos caracteres (primero para evitar conflictos con de un carácter)
     def t_GE(self, t):
         r'>='
-        self.build_column_info(t)
-        return t
+        return self.build_column_info(t)
 
     def t_LE(self, t):
         r'<='
-        self.build_column_info(t)
-        return t
+        return self.build_column_info(t)
 
     def t_EQ(self, t):
         r'=='
-        self.build_column_info(t)
-        return t
+        return self.build_column_info(t)
 
     def t_AND(self, t):
         r'&&'
-        self.build_column_info(t)
-        return t
+        return self.build_column_info(t)
 
     def t_OR(self, t):
         r'\|\|'
-        self.build_column_info(t)
-        return t
+        return self.build_column_info(t)
 
     # Operadores de un carácter
     def t_PLUS(self, t):
         r'\+'
-        self.build_column_info(t)
-        return t
+        return self.build_column_info(t)
 
     def t_MINUS(self, t):
         r'-'
-        self.build_column_info(t)
-        return t
+        return self.build_column_info(t)
 
     def t_TIMES(self, t):
         r'\*'
-        self.build_column_info(t)
-        return t
+        return self.build_column_info(t)
 
     def t_DIVIDE(self, t):
         r'/'
-        self.build_column_info(t)
-        return t
+        return self.build_column_info(t)
 
     def t_GT(self, t):
         r'>'
-        self.build_column_info(t)
-        return t
+        return self.build_column_info(t)
 
     def t_LT(self, t):
         r'<'
-        self.build_column_info(t)
-        return t
+        return self.build_column_info(t)
 
     def t_ASSIGN(self, t):
         r'='
-        self.build_column_info(t)
-        return t
+        return self.build_column_info(t)
 
     def t_NOT(self, t):
         r'!'
-        self.build_column_info(t)
-        return t
+        return self.build_column_info(t)
 
     def t_DOT(self, t):
         r'\.'
-        self.build_column_info(t)
-        return t
+        return self.build_column_info(t)
 
     def t_LPAREN(self, t):
         r'\('
-        self.build_column_info(t)
-        return t
+        return self.build_column_info(t)
 
     def t_RPAREN(self, t):
         r'\)'
-        self.build_column_info(t)
-        return t
+        return self.build_column_info(t)
 
     def t_LBRACE(self, t):
         r'\{'
-        self.build_column_info(t)
-        return t
+        return self.build_column_info(t)
 
     def t_RBRACE(self, t):
         r'\}'
-        self.build_column_info(t)
-        return t
+        return self.build_column_info(t)
 
     def t_COMMA(self, t):
         r','
-        self.build_column_info(t)
-        return t
+        return self.build_column_info(t)
 
     def t_SEMICOLON(self, t):
         r';'
-        self.build_column_info(t)
-        return t
+        return self.build_column_info(t)
 
     def build_column_info(self, t) -> None:
         """Calcula la posición de columna relativa a la línea actual"""
-        t.column_start = t.lexpos - self.line_start + 1
+        global total_columns
+        t.column_start = t.lexpos - total_columns + 1
         t.column_end = t.column_start + len(t.value)
+        total_columns += len(t.value)
+        return t
 
     def t_COMMENT(self, t):
         r'/\*[\s\S]*?\*/|//[^\n]*'
         n = t.value.count('\n')
         if n:
+            global total_columns
             t.lexer.lineno += n
-            last_nl = t.value.rfind('\n')
-            self.line_start = t.lexpos + last_nl + 1
+            total_columns = 0
         return None
 
     def t_FLOAT_VALUE(self, t):
-        r'(\d+(\.\d+)?e[+-]?\d+)|(\d+\.\d+)'
+        r'((0|[1-9]\d*)(\.\d+)?[eE][+-]?\d+)|((0|[1-9]\d*)\.\d+)'
         self.build_column_info(t)
-
-        t.raw = t.value # guarda lexema original antse de convertirlo a float
+        t.raw = t.value
         t.value = float(t.value)
         return t
 
     def t_INT_VALUE(self, t):
         r'0b[01]+|0x[0-9A-F]+|0[0-7]+|0|[1-9][0-9]*'
         self.build_column_info(t)
-
-        t.raw = t.value  # lexema original
+        t.raw = t.value
         s = t.value
         if s.startswith('0b'):
             t.value = int(s[2:], 2)
@@ -183,20 +165,23 @@ class Lexer:
             t.value = int(s, 8)
         else:
             t.value = int(s, 10)
-
         return t
 
-    def t_BAD_CHAR(self, t):
-        r"'[^\n']{2,}'"
-        print(f"ERROR: literal char inválido {t.value} en línea {t.lineno}")
-        return None
-    
     def t_CHAR_VALUE(self, t):
-        r"'[^\n']'"
+        r"'(\\.|[^\n\\'])'"
         self.build_column_info(t)
-
         t.raw = t.value
-        ch = t.value[1]
+        ch_str = t.value[1:-1]
+        
+        # Procesar secuencias de escape
+        escape_map = {
+            'n': '\n', 't': '\t', 'r': '\r', '\\': '\\', "'": "'"
+        }
+        if ch_str.startswith('\\') and len(ch_str) == 2:
+            ch = escape_map.get(ch_str[1], ch_str[1])
+        else:
+            ch = ch_str
+        
         if ord(ch) > 255:
             print(f"ERROR: char fuera de ASCII-extendido en línea {t.lineno}")
             return None
@@ -206,14 +191,19 @@ class Lexer:
     def t_ID(self, t):
         r'[A-Za-z_][A-Za-z0-9_]*'
         self.build_column_info(t)
-
-        t.type = self.reserved_map.get(t.value, 'ID') #detecta palabras reservadas
+        t.type = self.reserved_map.get(t.value, 'ID')
+        # Convertir TRUE y FALSE a booleanos
+        if t.type == 'TRUE':
+            t.value = True
+        elif t.type == 'FALSE':
+            t.value = False
         return t
 
     def t_newline(self, t):
         r'\n+'
+        global total_columns
         t.lexer.lineno += t.value.count('\n')
-        self.line_start = t.lexpos + len(t.value)
+        total_columns = 0
 
     def t_error(self, t):
         print(f"Illegal character '{t.value[0]}' at line {t.lineno}")
