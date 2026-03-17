@@ -1,11 +1,10 @@
 import ply.lex as lex
 
-# Variable global para rastrear la columna total
-total_columns = 0
-
+#REGEXP para hacer pruebas
 class Lexer:
     def __init__(self) -> None:
         self.lexer = lex.lex(module=self)
+        self.line_start = 0
 
     reserved = (
         'TRUE',
@@ -22,7 +21,7 @@ class Lexer:
         'WHILE',
         'PRINT',
         'NEW',
-        'RECORD'
+        'RECORD',
         'BREAK'
     ) # Esta correcto
 
@@ -44,122 +43,53 @@ class Lexer:
 
     reserved_map = {r.lower(): r for r in reserved}
 
+    t_PLUS = r'\+'
+    t_MINUS = r'-'
+    t_TIMES = r'\*'
+    t_DIVIDE = r'/'
+
+    t_AND = r'&&'
+    t_OR = r'\|\|'
+    t_NOT = r'!'
+
+    t_GE = r'>='
+    t_GT = r'>'
+    t_LE = r'<='
+    t_LT = r'<'
+    t_EQ = r'=='
+    t_ASSIGN = r'='
+
+    t_DOT = r'\.'
+
+    t_LPAREN = r'\('
+    t_RPAREN = r'\)'
+    t_LBRACE = r'\{'
+    t_RBRACE = r'\}'
+    t_COMMA = r','
+    t_SEMICOLON = r';'
+
     t_ignore = ' \t\r'
 
-    # Operadores de dos caracteres (primero para evitar conflictos con de un carácter)
-    def t_GE(self, t):
-        r'>='
-        return self.build_column_info(t)
-
-    def t_LE(self, t):
-        r'<='
-        return self.build_column_info(t)
-
-    def t_EQ(self, t):
-        r'=='
-        return self.build_column_info(t)
-
-    def t_AND(self, t):
-        r'&&'
-        return self.build_column_info(t)
-
-    def t_OR(self, t):
-        r'\|\|'
-        return self.build_column_info(t)
-
-    # Operadores de un carácter
-    def t_PLUS(self, t):
-        r'\+'
-        return self.build_column_info(t)
-
-    def t_MINUS(self, t):
-        r'-'
-        return self.build_column_info(t)
-
-    def t_TIMES(self, t):
-        r'\*'
-        return self.build_column_info(t)
-
-    def t_DIVIDE(self, t):
-        r'/'
-        return self.build_column_info(t)
-
-    def t_GT(self, t):
-        r'>'
-        return self.build_column_info(t)
-
-    def t_LT(self, t):
-        r'<'
-        return self.build_column_info(t)
-
-    def t_ASSIGN(self, t):
-        r'='
-        return self.build_column_info(t)
-
-    def t_NOT(self, t):
-        r'!'
-        return self.build_column_info(t)
-
-    def t_DOT(self, t):
-        r'\.'
-        return self.build_column_info(t)
-
-    def t_LPAREN(self, t):
-        r'\('
-        return self.build_column_info(t)
-
-    def t_RPAREN(self, t):
-        r'\)'
-        return self.build_column_info(t)
-
-    def t_LBRACE(self, t):
-        r'\{'
-        return self.build_column_info(t)
-
-    def t_RBRACE(self, t):
-        r'\}'
-        return self.build_column_info(t)
-
-    def t_COMMA(self, t):
-        r','
-        return self.build_column_info(t)
-
-    def t_SEMICOLON(self, t):
-        r';'
-        return self.build_column_info(t)
-
-    def build_column_info(self, t) -> None:
-        """Calcula la posición de columna relativa a la línea actual"""
-        global total_columns
-        t.column_start = t.lexpos - total_columns + 1
-        t.column_end = t.column_start + len(t.value)
-        total_columns += len(t.value)
-        return t
 
     def t_COMMENT(self, t):
         r'/\*[\s\S]*?\*/|//[^\n]*'
         n = t.value.count('\n')
         if n:
-            global total_columns
             t.lexer.lineno += n
-            total_columns = 0
+            last_nl = t.value.rfind('\n')
+            self.line_start = t.lexpos + last_nl + 1
         return None
 
     def t_FLOAT_VALUE(self, t):
-<<<<<<< HEAD
-        r'((0|[1-9]\d*)(\.\d+)?[eE][+-]?\d+)|((0|[1-9]\d*)\.\d+)'
-        self.build_column_info(t)
-=======
         r'(\d+(\.\d+)?e[+-]?\d+)|(\d+\.\d+)'
->>>>>>> parent of caf0ce4 (comentarios)
-        t.raw = t.value
+        t.raw = t.value # guarda lexema original antse de convertirlo a float
         t.value = float(t.value)
         return t
 
     def t_INT_VALUE(self, t):
         r'0b[01]+|0x[0-9A-F]+|0[0-7]+|0|[1-9][0-9]*'
-        self.build_column_info(t)
-        t.raw = t.value
+        t.raw = t.value  # lexema original
+
         s = t.value
         if s.startswith('0b'):
             t.value = int(s[2:], 2)
@@ -169,23 +99,18 @@ class Lexer:
             t.value = int(s, 8)
         else:
             t.value = int(s, 10)
+
         return t
 
+    def t_BAD_CHAR(self, t):
+        r"'[^\n']{2,}'"
+        print(f"ERROR: literal char inválido {t.value} en línea {t.lineno}")
+        return None
+    
     def t_CHAR_VALUE(self, t):
-        r"'(\\.|[^\n\\'])'"
-        self.build_column_info(t)
+        r"'[^\n']'"
         t.raw = t.value
-        ch_str = t.value[1:-1]
-        
-        # Procesar secuencias de escape
-        escape_map = {
-            'n': '\n', 't': '\t', 'r': '\r', '\\': '\\', "'": "'"
-        }
-        if ch_str.startswith('\\') and len(ch_str) == 2:
-            ch = escape_map.get(ch_str[1], ch_str[1])
-        else:
-            ch = ch_str
-        
+        ch = t.value[1]
         if ord(ch) > 255:
             print(f"ERROR: char fuera de ASCII-extendido en línea {t.lineno}")
             return None
@@ -194,24 +119,13 @@ class Lexer:
 
     def t_ID(self, t):
         r'[A-Za-z_][A-Za-z0-9_]*'
-<<<<<<< HEAD
-        self.build_column_info(t)
-        t.type = self.reserved_map.get(t.value, 'ID')
-        # Convertir TRUE y FALSE a booleanos
-        if t.type == 'TRUE':
-            t.value = True
-        elif t.type == 'FALSE':
-            t.value = False
-=======
-        t.type = self.reserved_map.get(t.value, 'ID')
->>>>>>> parent of caf0ce4 (comentarios)
+        t.type = self.reserved_map.get(t.value, 'ID') #detecta palabras reservadas
         return t
 
     def t_newline(self, t):
         r'\n+'
-        global total_columns
         t.lexer.lineno += t.value.count('\n')
-        total_columns = 0
+        self.line_start = t.lexpos + len(t.value)
 
     def t_error(self, t):
         print(f"Illegal character '{t.value[0]}' at line {t.lineno}")
