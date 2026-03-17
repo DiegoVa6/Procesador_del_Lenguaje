@@ -70,7 +70,12 @@ class Lexer:
 
     t_ignore = ' \t\r'
 
-
+    def build_column_info(t) -> None:
+        global total_columns
+        t.column_start = t.lexpos - total_columns + 1
+        t.column_end = t.column_start + len(t.value)
+        total_columns += len(t.value)
+        
     def t_COMMENT(self, t):
         r'/\*[\s\S]*?\*/|//[^\n]*'
         n = t.value.count('\n')
