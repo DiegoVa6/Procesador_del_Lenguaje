@@ -22,7 +22,7 @@ class Lexer:
         'WHILE',
         'PRINT',
         'NEW',
-        'RECORD',
+        'RECORD'
         'BREAK'
     ) # Esta correcto
 
@@ -146,8 +146,12 @@ class Lexer:
         return None
 
     def t_FLOAT_VALUE(self, t):
+<<<<<<< HEAD
         r'((0|[1-9]\d*)(\.\d+)?[eE][+-]?\d+)|((0|[1-9]\d*)\.\d+)'
         self.build_column_info(t)
+=======
+        r'(\d+(\.\d+)?e[+-]?\d+)|(\d+\.\d+)'
+>>>>>>> parent of caf0ce4 (comentarios)
         t.raw = t.value
         t.value = float(t.value)
         return t
@@ -190,6 +194,7 @@ class Lexer:
 
     def t_ID(self, t):
         r'[A-Za-z_][A-Za-z0-9_]*'
+<<<<<<< HEAD
         self.build_column_info(t)
         t.type = self.reserved_map.get(t.value, 'ID')
         # Convertir TRUE y FALSE a booleanos
@@ -197,6 +202,9 @@ class Lexer:
             t.value = True
         elif t.type == 'FALSE':
             t.value = False
+=======
+        t.type = self.reserved_map.get(t.value, 'ID')
+>>>>>>> parent of caf0ce4 (comentarios)
         return t
 
     def t_newline(self, t):
