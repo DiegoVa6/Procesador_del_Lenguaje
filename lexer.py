@@ -43,38 +43,114 @@ class Lexer:
 
     reserved_map = {r.lower(): r for r in reserved}
 
-    t_PLUS = r'\+'
-    t_MINUS = r'-'
-    t_TIMES = r'\*'
-    t_DIVIDE = r'/'
-
-    t_AND = r'&&'
-    t_OR = r'\|\|'
-    t_NOT = r'!'
-
-    t_GE = r'>='
-    t_GT = r'>'
-    t_LE = r'<='
-    t_LT = r'<'
-    t_EQ = r'=='
-    t_ASSIGN = r'='
-
-    t_DOT = r'\.'
-
-    t_LPAREN = r'\('
-    t_RPAREN = r'\)'
-    t_LBRACE = r'\{'
-    t_RBRACE = r'\}'
-    t_COMMA = r','
-    t_SEMICOLON = r';'
-
     t_ignore = ' \t\r'
 
+    # Operadores de dos caracteres (primero para evitar conflictos con de un carácter)
+    def t_GE(self, t):
+        r'>='
+        self.build_column_info(t)
+        return t
+
+    def t_LE(self, t):
+        r'<='
+        self.build_column_info(t)
+        return t
+
+    def t_EQ(self, t):
+        r'=='
+        self.build_column_info(t)
+        return t
+
+    def t_AND(self, t):
+        r'&&'
+        self.build_column_info(t)
+        return t
+
+    def t_OR(self, t):
+        r'\|\|'
+        self.build_column_info(t)
+        return t
+
+    # Operadores de un carácter
+    def t_PLUS(self, t):
+        r'\+'
+        self.build_column_info(t)
+        return t
+
+    def t_MINUS(self, t):
+        r'-'
+        self.build_column_info(t)
+        return t
+
+    def t_TIMES(self, t):
+        r'\*'
+        self.build_column_info(t)
+        return t
+
+    def t_DIVIDE(self, t):
+        r'/'
+        self.build_column_info(t)
+        return t
+
+    def t_GT(self, t):
+        r'>'
+        self.build_column_info(t)
+        return t
+
+    def t_LT(self, t):
+        r'<'
+        self.build_column_info(t)
+        return t
+
+    def t_ASSIGN(self, t):
+        r'='
+        self.build_column_info(t)
+        return t
+
+    def t_NOT(self, t):
+        r'!'
+        self.build_column_info(t)
+        return t
+
+    def t_DOT(self, t):
+        r'\.'
+        self.build_column_info(t)
+        return t
+
+    def t_LPAREN(self, t):
+        r'\('
+        self.build_column_info(t)
+        return t
+
+    def t_RPAREN(self, t):
+        r'\)'
+        self.build_column_info(t)
+        return t
+
+    def t_LBRACE(self, t):
+        r'\{'
+        self.build_column_info(t)
+        return t
+
+    def t_RBRACE(self, t):
+        r'\}'
+        self.build_column_info(t)
+        return t
+
+    def t_COMMA(self, t):
+        r','
+        self.build_column_info(t)
+        return t
+
+    def t_SEMICOLON(self, t):
+        r';'
+        self.build_column_info(t)
+        return t
+
     def build_column_info(self, t) -> None:
-        global total_columns
-        t.column_start = t.lexpos - total_columns + 1
+        """Calcula la posición de columna relativa a la línea actual"""
+        t.column_start = t.lexpos - self.line_start + 1
         t.column_end = t.column_start + len(t.value)
-        total_columns += len(t.value)
 
     def t_COMMENT(self, t):
         r'/\*[\s\S]*?\*/|//[^\n]*'
@@ -130,7 +206,7 @@ class Lexer:
     def t_ID(self, t):
         r'[A-Za-z_][A-Za-z0-9_]*'
         self.build_column_info(t)
-        
+
         t.type = self.reserved_map.get(t.value, 'ID') #detecta palabras reservadas
         return t
 
