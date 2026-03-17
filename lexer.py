@@ -70,12 +70,12 @@ class Lexer:
 
     t_ignore = ' \t\r'
 
-    def build_column_info(t) -> None:
+    def build_column_info(self, t) -> None:
         global total_columns
         t.column_start = t.lexpos - total_columns + 1
         t.column_end = t.column_start + len(t.value)
         total_columns += len(t.value)
-        
+
     def t_COMMENT(self, t):
         r'/\*[\s\S]*?\*/|//[^\n]*'
         n = t.value.count('\n')
@@ -87,14 +87,17 @@ class Lexer:
 
     def t_FLOAT_VALUE(self, t):
         r'(\d+(\.\d+)?e[+-]?\d+)|(\d+\.\d+)'
+        self.build_column_info(t)
+
         t.raw = t.value # guarda lexema original antse de convertirlo a float
         t.value = float(t.value)
         return t
 
     def t_INT_VALUE(self, t):
         r'0b[01]+|0x[0-9A-F]+|0[0-7]+|0|[1-9][0-9]*'
-        t.raw = t.value  # lexema original
+        self.build_column_info(t)
 
+        t.raw = t.value  # lexema original
         s = t.value
         if s.startswith('0b'):
             t.value = int(s[2:], 2)
@@ -114,6 +117,8 @@ class Lexer:
     
     def t_CHAR_VALUE(self, t):
         r"'[^\n']'"
+        self.build_column_info(t)
+
         t.raw = t.value
         ch = t.value[1]
         if ord(ch) > 255:
@@ -124,6 +129,8 @@ class Lexer:
 
     def t_ID(self, t):
         r'[A-Za-z_][A-Za-z0-9_]*'
+        self.build_column_info(t)
+        
         t.type = self.reserved_map.get(t.value, 'ID') #detecta palabras reservadas
         return t
 
