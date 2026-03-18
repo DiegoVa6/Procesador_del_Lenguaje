@@ -113,7 +113,7 @@ class Lexer:
         return t
     
     def t_CHAR_VALUE(self, t):
-        r"'(?:[^'\\]|\\.)?'"
+        r"'[\s\S]'"
         t.raw = t.value
         ch = t.value[1]
         if ord(ch) > 255:
