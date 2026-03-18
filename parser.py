@@ -3,7 +3,13 @@ from lexer import Lexer
 
 
 class Parser:
+    def __init__(self):
+        self.lexer = Lexer()
+        self.has_errors = False
+        self.parser = yacc.yacc(module=self, write_tables=True, debug=False)
+
     tokens = Lexer.tokens
+    start = 'program'
 
     # De menor a mayor precedencia
     precedence = (
@@ -18,35 +24,26 @@ class Parser:
         ('right', 'UMINUS', 'UPLUS'),
     )
 
-    start = 'program'
-
-    def __init__(self):
-        self.lexer = Lexer()
-        self.has_errors = False
-        self.parser = yacc.yacc(module=self, start=self.start)
-
-    def parse(self, data: str):
-        self.has_errors = False
-        self.lexer.input(data)
-        return self.parser.parse(input=data, lexer=self.lexer, tracking=True)
-
-    # -------------------------
+    # =========================
     # Programa
-    # -------------------------
+    # =========================
 
     def p_program(self, p):
-        'program : top_items_opt'
-        p[0] = None
+        'program : top_list_opt'
+        p[0] = ('program', p[1] if p[1] is not None else [])
 
-    def p_top_items_opt(self, p):
-        '''top_items_opt : top_items
-                         | empty'''
-        p[0] = None
+    def p_top_list_opt(self, p):
+        '''top_list_opt : top_list
+                        | empty'''
+        p[0] = p[1]
 
-    def p_top_items(self, p):
-        '''top_items : top_items top_item
-                     | top_item'''
-        p[0] = None
+    def p_top_list_single(self, p):
+        'top_list : top_item'
+        p[0] = [p[1]]
+
+    def p_top_list_rec(self, p):
+        'top_list : top_list top_item'
+        p[0] = p[1] + [p[2]]
 
     def p_top_item(self, p):
         '''top_item : SEMICOLON
@@ -54,35 +51,50 @@ class Parser:
                     | compound_statement
                     | function_decl
                     | record_decl SEMICOLON'''
-        p[0] = None
+        if len(p) == 2:
+            if p.slice[1].type == 'SEMICOLON':
+                p[0] = ('empty_stmt',)
+            else:
+                p[0] = p[1]
+        else:
+            p[0] = p[1]
 
-    # -------------------------
+    # =========================
     # Bloques
-    # -------------------------
+    # =========================
 
     def p_block(self, p):
         'block : LBRACE block_items_opt RBRACE'
-        p[0] = None
+        p[0] = ('block', p[2] if p[2] is not None else [])
 
     def p_block_items_opt(self, p):
         '''block_items_opt : block_items
                            | empty'''
-        p[0] = None
+        p[0] = p[1]
 
-    def p_block_items(self, p):
-        '''block_items : block_items block_item
-                       | block_item'''
-        p[0] = None
+    def p_block_items_single(self, p):
+        'block_items : block_item'
+        p[0] = [p[1]]
+
+    def p_block_items_rec(self, p):
+        'block_items : block_items block_item'
+        p[0] = p[1] + [p[2]]
 
     def p_block_item(self, p):
         '''block_item : SEMICOLON
                       | simple_statement SEMICOLON
                       | compound_statement'''
-        p[0] = None
+        if len(p) == 2:
+            if p.slice[1].type == 'SEMICOLON':
+                p[0] = ('empty_stmt',)
+            else:
+                p[0] = p[1]
+        else:
+            p[0] = p[1]
 
-    # -------------------------
+    # =========================
     # Sentencias
-    # -------------------------
+    # =========================
 
     def p_simple_statement(self, p):
         '''simple_statement : declaration
@@ -91,135 +103,170 @@ class Parser:
                             | break_stmt
                             | return_stmt
                             | expression'''
-        p[0] = None
+        p[0] = p[1]
 
     def p_compound_statement(self, p):
         '''compound_statement : if_stmt
                               | while_stmt
                               | do_while_stmt'''
-        p[0] = None
+        p[0] = p[1]
 
-    # -------------------------
-    # Declaraciones
-    # -------------------------
+    # =========================
+    # Declaraciones y asignaciones
+    # =========================
 
     def p_declaration(self, p):
-        'declaration : type_spec ID decl_rest'
-        p[0] = None
+        'declaration : type_spec ID decl_tail'
+        # decl_tail puede ser:
+        # None                        -> declaración simple
+        # ('init', expr)              -> declaración con inicialización
+        # ('multi', [id2, id3, ...])  -> multideclaración
+        tail = p[3]
 
-    def p_decl_rest(self, p):
-        '''decl_rest : empty
+        if tail is None:
+            p[0] = ('decl', p[1], [p[2]])
+        elif tail[0] == 'init':
+            p[0] = ('decl_init', p[1], p[2], tail[1])
+        else:
+            p[0] = ('decl', p[1], [p[2]] + tail[1])
+
+    def p_decl_tail(self, p):
+        '''decl_tail : empty
                      | ASSIGN expression
                      | COMMA id_list_tail'''
-        p[0] = None
+        if len(p) == 2:
+            p[0] = None
+        elif p.slice[1].type == 'ASSIGN':
+            p[0] = ('init', p[2])
+        else:
+            p[0] = ('multi', p[2])
 
-    def p_id_list_tail(self, p):
-        '''id_list_tail : ID
-                        | ID COMMA id_list_tail'''
-        p[0] = None
+    def p_id_list_tail_single(self, p):
+        'id_list_tail : ID'
+        p[0] = [p[1]]
+
+    def p_id_list_tail_rec(self, p):
+        'id_list_tail : ID COMMA id_list_tail'
+        p[0] = [p[1]] + p[3]
 
     def p_assignment(self, p):
         'assignment : lvalue ASSIGN expression'
-        p[0] = None
+        p[0] = ('assign', p[1], p[3])
 
-    def p_lvalue(self, p):
-        '''lvalue : ID
-                  | lvalue DOT ID'''
-        p[0] = None
+    def p_lvalue_id(self, p):
+        'lvalue : ID'
+        p[0] = ('var', p[1])
 
-    # -------------------------
+    def p_lvalue_field(self, p):
+        'lvalue : lvalue DOT ID'
+        p[0] = ('field_access', p[1], p[3])
+
+    # =========================
     # Print / break / return
-    # -------------------------
+    # =========================
 
     def p_print_stmt(self, p):
         'print_stmt : PRINT LPAREN expression RPAREN'
-        p[0] = None
+        p[0] = ('print', p[3])
 
     def p_break_stmt(self, p):
         'break_stmt : BREAK'
-        p[0] = None
+        p[0] = ('break',)
 
     def p_return_stmt(self, p):
         'return_stmt : RETURN expression'
-        p[0] = None
+        p[0] = ('return', p[2])
 
-    # -------------------------
+    # =========================
     # Control de flujo
-    # -------------------------
+    # =========================
 
     def p_if_stmt(self, p):
         '''if_stmt : IF LPAREN expression RPAREN block %prec IFX
                    | IF LPAREN expression RPAREN block ELSE block'''
-        p[0] = None
+        if len(p) == 6:
+            p[0] = ('if', p[3], p[5], None)
+        else:
+            p[0] = ('if', p[3], p[5], p[7])
 
     def p_while_stmt(self, p):
         'while_stmt : WHILE LPAREN expression RPAREN block'
-        p[0] = None
+        p[0] = ('while', p[3], p[5])
 
     def p_do_while_stmt(self, p):
         'do_while_stmt : DO block WHILE LPAREN expression RPAREN'
-        p[0] = None
+        p[0] = ('do_while', p[2], p[5])
 
-    # -------------------------
+    # =========================
     # Funciones y records
-    # -------------------------
+    # =========================
 
     def p_function_decl(self, p):
         'function_decl : return_type ID LPAREN param_list_opt RPAREN block'
-        p[0] = None
+        p[0] = ('func_decl', p[1], p[2], p[4], p[6])
 
     def p_return_type(self, p):
         '''return_type : type_spec
                        | VOID'''
-        p[0] = None
+        p[0] = p[1]
 
     def p_param_list_opt(self, p):
         '''param_list_opt : param_list
                           | empty'''
-        p[0] = None
+        p[0] = p[1] if p[1] is not None else []
 
-    def p_param_list(self, p):
-        '''param_list : param
-                      | param COMMA param_list'''
-        p[0] = None
+    def p_param_list_single(self, p):
+        'param_list : param'
+        p[0] = [p[1]]
+
+    def p_param_list_rec(self, p):
+        'param_list : param_list COMMA param'
+        p[0] = p[1] + [p[3]]
 
     def p_param(self, p):
         'param : type_spec ID'
-        p[0] = None
+        p[0] = (p[1], p[2])
 
     def p_record_decl(self, p):
         'record_decl : RECORD ID LPAREN field_list_opt RPAREN'
-        p[0] = None
+        p[0] = ('record_decl', p[2], p[4])
 
     def p_field_list_opt(self, p):
         '''field_list_opt : field_list
                           | empty'''
-        p[0] = None
+        p[0] = p[1] if p[1] is not None else []
 
-    def p_field_list(self, p):
-        '''field_list : field_decl
-                      | field_decl COMMA field_list'''
-        p[0] = None
+    def p_field_list_single(self, p):
+        'field_list : field'
+        p[0] = [p[1]]
 
-    def p_field_decl(self, p):
-        'field_decl : type_spec ID'
-        p[0] = None
+    def p_field_list_rec(self, p):
+        'field_list : field_list COMMA field'
+        p[0] = p[1] + [p[3]]
 
-    # -------------------------
+    def p_field(self, p):
+        'field : type_spec ID'
+        p[0] = (p[1], p[2])
+
+    # =========================
     # Tipos
-    # -------------------------
+    # =========================
 
-    def p_type_spec(self, p):
+    def p_type_spec_basic(self, p):
         '''type_spec : INT
                      | FLOAT
                      | CHAR
-                     | BOOLEAN
-                     | ID'''
-        p[0] = None
+                     | BOOLEAN'''
+        p[0] = p[1]
 
-    # -------------------------
+    def p_type_spec_record(self, p):
+        'type_spec : ID'
+        # Los tipos de registro definidos por el usuario salen del lexer como ID
+        p[0] = ('type_id', p[1])
+
+    # =========================
     # Expresiones
-    # -------------------------
+    # =========================
 
     def p_expression_binary(self, p):
         '''expression : expression PLUS expression
@@ -233,40 +280,58 @@ class Parser:
                       | expression LT expression
                       | expression LE expression
                       | expression EQ expression'''
-        p[0] = None
+        p[0] = ('binop', p[2], p[1], p[3])
 
     def p_expression_unary(self, p):
         '''expression : MINUS expression %prec UMINUS
                       | PLUS expression %prec UPLUS
                       | NOT expression'''
-        p[0] = None
+        p[0] = ('unop', p[1], p[2])
 
     def p_expression_postfix(self, p):
         'expression : postfix_expression'
-        p[0] = None
+        p[0] = p[1]
 
-    def p_postfix_expression(self, p):
-        '''postfix_expression : atom
-                              | postfix_expression DOT ID
-                              | postfix_expression LPAREN argument_list_opt RPAREN'''
-        p[0] = None
+    def p_postfix_expression_primary(self, p):
+        'postfix_expression : primary_expression'
+        p[0] = p[1]
 
-    def p_atom(self, p):
-        '''atom : literal
-                | ID
-                | NEW ID LPAREN argument_list_opt RPAREN
-                | LPAREN expression RPAREN'''
-        p[0] = None
+    def p_postfix_expression_field(self, p):
+        'postfix_expression : postfix_expression DOT ID'
+        p[0] = ('field_access', p[1], p[3])
+
+    def p_postfix_expression_call(self, p):
+        'postfix_expression : postfix_expression LPAREN argument_list_opt RPAREN'
+        p[0] = ('call', p[1], p[3])
+
+    def p_primary_literal(self, p):
+        'primary_expression : literal'
+        p[0] = p[1]
+
+    def p_primary_id(self, p):
+        'primary_expression : ID'
+        p[0] = ('var', p[1])
+
+    def p_primary_new(self, p):
+        'primary_expression : NEW ID LPAREN argument_list_opt RPAREN'
+        p[0] = ('new', p[2], p[4])
+
+    def p_primary_group(self, p):
+        'primary_expression : LPAREN expression RPAREN'
+        p[0] = p[2]
 
     def p_argument_list_opt(self, p):
         '''argument_list_opt : argument_list
                              | empty'''
-        p[0] = None
+        p[0] = p[1] if p[1] is not None else []
 
-    def p_argument_list(self, p):
-        '''argument_list : expression
-                         | expression COMMA argument_list'''
-        p[0] = None
+    def p_argument_list_single(self, p):
+        'argument_list : expression'
+        p[0] = [p[1]]
+
+    def p_argument_list_rec(self, p):
+        'argument_list : argument_list COMMA expression'
+        p[0] = p[1] + [p[3]]
 
     def p_literal(self, p):
         '''literal : INT_VALUE
@@ -274,19 +339,19 @@ class Parser:
                    | CHAR_VALUE
                    | TRUE
                    | FALSE'''
-        p[0] = None
+        p[0] = ('const', p[1])
 
-    # -------------------------
+    # =========================
     # Vacío
-    # -------------------------
+    # =========================
 
     def p_empty(self, p):
         'empty :'
-        pass
+        p[0] = None
 
-    # -------------------------
+    # =========================
     # Errores
-    # -------------------------
+    # =========================
 
     def p_error(self, p):
         self.has_errors = True
@@ -297,3 +362,18 @@ class Parser:
 
         col = getattr(p, 'col_start', '?')
         print(f"[ERROR] Token '{p.type}' inesperado en la línea {p.lineno}, columna {col}")
+
+    # =========================
+    # API pública
+    # =========================
+
+    def parse(self, input_text):
+        self.has_errors = False
+        self.lexer.input(input_text)
+
+        return self.parser.parse(
+            input=input_text,
+            lexer=self.lexer.lexer,      # lexer interno de PLY, sí tiene lineno
+            tokenfunc=self.lexer.token,  # seguimos usando tu token() para columnas
+            tracking=True
+        )

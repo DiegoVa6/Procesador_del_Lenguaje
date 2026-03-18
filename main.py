@@ -11,11 +11,11 @@ def read_file(path: str) -> str:
 
 
 def token_value_to_text(tok):
-    # Preferimos el lexema original si existe
+    # Prioridad al lexema original si el lexer lo guardó
     if hasattr(tok, "raw"):
         return tok.raw
 
-    # TRUE/FALSE en tu lexer guardan bool, pero para exportar interesa el lexema
+    # Para TRUE/FALSE, en tu lexer value es bool
     if tok.type == "TRUE":
         return "true"
     if tok.type == "FALSE":
@@ -51,7 +51,8 @@ def run_parser(input_path: str) -> int:
     parser = Parser()
     parser.parse(data)
 
-    # Si el fichero es correcto, no mostramos nada.
+    # El parser ya imprime errores si los hay.
+    # Si no hay errores, no se imprime nada.
     return 1 if parser.has_errors else 0
 
 
@@ -66,13 +67,14 @@ def main():
         input_path = sys.argv[1]
         sys.exit(run_parser(input_path))
 
-    if len(sys.argv) == 3 and sys.argv[1] == "--token":
+    elif len(sys.argv) == 3 and sys.argv[1] == "--token":
         input_path = sys.argv[2]
         export_tokens(input_path)
         sys.exit(0)
 
-    usage()
-    sys.exit(1)
+    else:
+        usage()
+        sys.exit(1)
 
 
 if __name__ == "__main__":
