@@ -11,8 +11,7 @@ def main():
         data = f.read()
 
     lavalexer = Lexer()
-    lavalexer.lexer.lineno = 1
-    lavalexer.lexer.input(data)
+    lavalexer.input(data)
 
     out_path = in_path.rsplit('.', 1)[0] + '.token'
 
@@ -25,7 +24,6 @@ def main():
             # usar columana que ya vienen calculadas en el token
             out.write(f"{tok.type}, {tok.value}, {tok.lineno}, {tok.col_start}, {tok.col_end}\n")
 
-    print(f"Analisis completo.Tokens generated and saved to {out_path}")
 
 if __name__ == "__main__":
     main()

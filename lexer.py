@@ -5,6 +5,11 @@ class Lexer:
     def __init__(self) -> None:
         self.lexer = lex.lex(module=self)
         self.line_start = 0
+    
+    def input(self, data):
+        self.line_start = 0
+        self.lexer.lineno = 1
+        self.lexer.input(data)
 
     reserved = (
         'TRUE',
