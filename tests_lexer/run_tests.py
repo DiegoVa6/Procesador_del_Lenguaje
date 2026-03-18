@@ -15,7 +15,7 @@ def run(file):
     print()
 
 def main():
-    for f in glob.glob("tests/*.lava"):
+    for f in glob.glob("*.lava"):
         run(f)
 
 if __name__ == "__main__":
