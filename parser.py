@@ -6,7 +6,14 @@ class Parser:
     def __init__(self):
         self.lexer = Lexer()
         self.has_errors = False
-        self.parser = yacc.yacc(module=self, write_tables=True, debug=False)
+        # write_tables=False  → no genera parser.out ni parser.tab.py en disco
+        # errorlog=NullLogger → suprime cualquier warning de PLY en consola
+        self.parser = yacc.yacc(
+            module=self,
+            write_tables=False,
+            debug=False,
+            errorlog=yacc.NullLogger(),
+        )
 
     tokens = Lexer.tokens
     start = 'program'
@@ -173,9 +180,15 @@ class Parser:
         'break_stmt : BREAK'
         p[0] = ('break',)
 
-    def p_return_stmt(self, p):
+    def p_return_stmt_expr(self, p):
+    # return con valor — usado en funciones con tipo de retorno concreto
         'return_stmt : RETURN expression'
         p[0] = ('return', p[2])
+
+def p_return_stmt_void(self, p):
+    # return vacío — solo válido en funciones void (se comprobará en P3)
+    'return_stmt : RETURN'
+    p[0] = ('return', None)
 
     # =========================
     # Control de flujo
@@ -201,14 +214,21 @@ class Parser:
     # Funciones y records
     # =========================
 
-    def p_function_decl(self, p):
-        'function_decl : return_type ID LPAREN param_list_opt RPAREN block'
+    def p_function_decl_typed(self, p):
+    # Función con tipo de retorno concreto (int, float, char, boolean, o registro)
+    # Se separa de void para eliminar el conflicto reduce/reduce:
+    # con return_type unificado, el parser no podía distinguir entre
+    # "int f(...)" (función) y "int a" (declaración de variable) con un
+    # solo token de lookahead.
+        'function_decl : type_spec ID LPAREN param_list_opt RPAREN block'
         p[0] = ('func_decl', p[1], p[2], p[4], p[6])
 
-    def p_return_type(self, p):
-        '''return_type : type_spec
-                       | VOID'''
-        p[0] = p[1]
+    def p_function_decl_void(self, p):
+    # Función void: VOID no pertenece a type_spec, por lo que no hay
+    # ambigüedad y puede seguir siendo una regla independiente.
+        'function_decl : VOID ID LPAREN param_list_opt RPAREN block'
+        p[0] = ('func_decl', 'void', p[2], p[4], p[6])
+
 
     def p_param_list_opt(self, p):
         '''param_list_opt : param_list
