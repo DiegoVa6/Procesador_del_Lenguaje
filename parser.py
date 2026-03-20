@@ -185,10 +185,10 @@ class Parser:
         'return_stmt : RETURN expression'
         p[0] = ('return', p[2])
 
-def p_return_stmt_void(self, p):
-    # return vacío — solo válido en funciones void (se comprobará en P3)
-    'return_stmt : RETURN'
-    p[0] = ('return', None)
+    def p_return_stmt_void(self, p):
+        # return vacío — solo válido en funciones void (se comprobará en P3)
+        'return_stmt : RETURN'
+        p[0] = ('return', None)
 
     # =========================
     # Control de flujo
@@ -215,17 +215,17 @@ def p_return_stmt_void(self, p):
     # =========================
 
     def p_function_decl_typed(self, p):
-    # Función con tipo de retorno concreto (int, float, char, boolean, o registro)
-    # Se separa de void para eliminar el conflicto reduce/reduce:
-    # con return_type unificado, el parser no podía distinguir entre
-    # "int f(...)" (función) y "int a" (declaración de variable) con un
-    # solo token de lookahead.
+        # Función con tipo de retorno concreto (int, float, char, boolean, o registro)
+        # Se separa de void para eliminar el conflicto reduce/reduce:
+        # con return_type unificado, el parser no podía distinguir entre
+        # "int f(...)" (función) y "int a" (declaración de variable) con un
+        # solo token de lookahead.
         'function_decl : type_spec ID LPAREN param_list_opt RPAREN block'
         p[0] = ('func_decl', p[1], p[2], p[4], p[6])
 
     def p_function_decl_void(self, p):
-    # Función void: VOID no pertenece a type_spec, por lo que no hay
-    # ambigüedad y puede seguir siendo una regla independiente.
+        # Función void: VOID no pertenece a type_spec, por lo que no hay
+        # ambigüedad y puede seguir siendo una regla independiente.
         'function_decl : VOID ID LPAREN param_list_opt RPAREN block'
         p[0] = ('func_decl', 'void', p[2], p[4], p[6])
 
