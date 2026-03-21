@@ -6,14 +6,7 @@ class Parser:
     def __init__(self):
         self.lexer = Lexer()
         self.has_errors = False
-        # write_tables=False  → no genera parser.out ni parser.tab.py en disco
-        # errorlog=NullLogger → suprime cualquier warning de PLY en consola
-        self.parser = yacc.yacc(
-            module=self,
-            write_tables=False,
-            debug=False,
-            errorlog=yacc.NullLogger(),
-        )
+        self.parser = yacc.yacc(module=self, write_tables=False, debug=False, errorlog=yacc.NullLogger())
 
     tokens = Lexer.tokens
     start = 'program'
@@ -31,9 +24,7 @@ class Parser:
         ('right', 'UMINUS', 'UPLUS'),
     )
 
-    # =========================
     # Programa
-    # =========================
 
     def p_program(self, p):
         'program : top_list_opt'
@@ -66,9 +57,7 @@ class Parser:
         else:
             p[0] = p[1]
 
-    # =========================
     # Bloques
-    # =========================
 
     def p_block(self, p):
         'block : LBRACE block_items_opt RBRACE'
@@ -99,9 +88,7 @@ class Parser:
         else:
             p[0] = p[1]
 
-    # =========================
     # Sentencias
-    # =========================
 
     def p_simple_statement(self, p):
         '''simple_statement : declaration
@@ -118,9 +105,7 @@ class Parser:
                               | do_while_stmt'''
         p[0] = p[1]
 
-    # =========================
     # Declaraciones y asignaciones
-    # =========================
 
     def p_declaration(self, p):
         'declaration : type_spec ID decl_tail'
@@ -168,9 +153,7 @@ class Parser:
         'lvalue : lvalue DOT ID'
         p[0] = ('field_access', p[1], p[3])
 
-    # =========================
     # Print / break / return
-    # =========================
 
     def p_print_stmt(self, p):
         'print_stmt : PRINT LPAREN expression RPAREN'
@@ -181,7 +164,7 @@ class Parser:
         p[0] = ('break',)
 
     def p_return_stmt_expr(self, p):
-    # return con valor — usado en funciones con tipo de retorno concreto
+        # return con valor — usado en funciones con tipo de retorno concreto
         'return_stmt : RETURN expression'
         p[0] = ('return', p[2])
 
@@ -190,9 +173,7 @@ class Parser:
         'return_stmt : RETURN'
         p[0] = ('return', None)
 
-    # =========================
     # Control de flujo
-    # =========================
 
     def p_if_stmt(self, p):
         '''if_stmt : IF LPAREN expression RPAREN block %prec IFX
@@ -210,22 +191,13 @@ class Parser:
         'do_while_stmt : DO block WHILE LPAREN expression RPAREN'
         p[0] = ('do_while', p[2], p[5])
 
-    # =========================
     # Funciones y records
-    # =========================
 
     def p_function_decl_typed(self, p):
-        # Función con tipo de retorno concreto (int, float, char, boolean, o registro)
-        # Se separa de void para eliminar el conflicto reduce/reduce:
-        # con return_type unificado, el parser no podía distinguir entre
-        # "int f(...)" (función) y "int a" (declaración de variable) con un
-        # solo token de lookahead.
         'function_decl : type_spec ID LPAREN param_list_opt RPAREN block'
         p[0] = ('func_decl', p[1], p[2], p[4], p[6])
 
     def p_function_decl_void(self, p):
-        # Función void: VOID no pertenece a type_spec, por lo que no hay
-        # ambigüedad y puede seguir siendo una regla independiente.
         'function_decl : VOID ID LPAREN param_list_opt RPAREN block'
         p[0] = ('func_decl', 'void', p[2], p[4], p[6])
 
@@ -268,9 +240,8 @@ class Parser:
         'field : type_spec ID'
         p[0] = (p[1], p[2])
 
-    # =========================
+
     # Tipos
-    # =========================
 
     def p_type_spec_basic(self, p):
         '''type_spec : INT
@@ -284,9 +255,8 @@ class Parser:
         # Los tipos de registro definidos por el usuario salen del lexer como ID
         p[0] = ('type_id', p[1])
 
-    # =========================
+
     # Expresiones
-    # =========================
 
     def p_expression_binary(self, p):
         '''expression : expression PLUS expression
@@ -361,18 +331,13 @@ class Parser:
                    | FALSE'''
         p[0] = ('const', p[1])
 
-    # =========================
-    # Vacío
-    # =========================
-
+    # Lambda para producciones vacías
     def p_lambda(self, p):
         'lambda :'
         p[0] = None
 
-    # =========================
-    # Errores
-    # =========================
 
+    # Errores
     def p_error(self, p):
         self.has_errors = True
 
@@ -383,10 +348,7 @@ class Parser:
         col = getattr(p, 'col_start', '?')
         print(f"[ERROR] Token '{p.type}' inesperado en la línea {p.lineno}, columna {col}")
 
-    # =========================
     # API pública
-    # =========================
-
     def parse(self, input_text):
         self.has_errors = False
         self.lexer.input(input_text)
