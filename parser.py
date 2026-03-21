@@ -41,7 +41,7 @@ class Parser:
 
     def p_top_list_opt(self, p):
         '''top_list_opt : top_list
-                        | empty'''
+                        | lambda'''
         p[0] = p[1]
 
     def p_top_list_single(self, p):
@@ -76,7 +76,7 @@ class Parser:
 
     def p_block_items_opt(self, p):
         '''block_items_opt : block_items
-                           | empty'''
+                           | lambda'''
         p[0] = p[1]
 
     def p_block_items_single(self, p):
@@ -138,7 +138,7 @@ class Parser:
             p[0] = ('decl', p[1], [p[2]] + tail[1])
 
     def p_decl_tail(self, p):
-        '''decl_tail : empty
+        '''decl_tail : lambda
                      | ASSIGN expression
                      | COMMA id_list_tail'''
         if len(p) == 2:
@@ -232,7 +232,7 @@ class Parser:
 
     def p_param_list_opt(self, p):
         '''param_list_opt : param_list
-                          | empty'''
+                          | lambda'''
         p[0] = p[1] if p[1] is not None else []
 
     def p_param_list_single(self, p):
@@ -253,7 +253,7 @@ class Parser:
 
     def p_field_list_opt(self, p):
         '''field_list_opt : field_list
-                          | empty'''
+                          | lambda'''
         p[0] = p[1] if p[1] is not None else []
 
     def p_field_list_single(self, p):
@@ -342,7 +342,7 @@ class Parser:
 
     def p_argument_list_opt(self, p):
         '''argument_list_opt : argument_list
-                             | empty'''
+                             | lambda'''
         p[0] = p[1] if p[1] is not None else []
 
     def p_argument_list_single(self, p):
@@ -365,8 +365,8 @@ class Parser:
     # Vacío
     # =========================
 
-    def p_empty(self, p):
-        'empty :'
+    def p_lambda(self, p):
+        'lambda :'
         p[0] = None
 
     # =========================
