@@ -50,9 +50,7 @@ def run_parser(input_path: str) -> int:
     data = read_file(input_path)
     parser = Parser()
     parser.parse(data)
-
-    # El parser ya imprime errores si los hay.
-    # Si no hay errores, no se imprime nada.
+    # Si hubo errores de sintaxis, el parser los habrá reportado por consola y habremos puesto has_errors a True
     return 1 if parser.has_errors else 0
 
 
