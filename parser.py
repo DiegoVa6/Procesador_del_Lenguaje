@@ -21,7 +21,9 @@ class Parser:
         ('right', 'UMINUS', 'UPLUS'),
     )
 
-    # --- Programa ---
+    # =========================
+    # Programa
+    # =========================
 
     def p_program(self, p):
         'program : top_list_opt'
@@ -57,7 +59,9 @@ class Parser:
         else:
             p[0] = p[1]
 
-    # --- Bloques ---
+    # =========================
+    # Bloques
+    # =========================
 
     def p_block(self, p):
         'block : LBRACE block_items_opt RBRACE'
@@ -91,7 +95,9 @@ class Parser:
         else:
             p[0] = p[1]
 
-    # --- Sentencias ---
+    # =========================
+    # Sentencias
+    # =========================
 
     def p_simple_statement(self, p):
         '''simple_statement : declaration
@@ -108,8 +114,9 @@ class Parser:
                               | do_while_stmt'''
         p[0] = p[1]
 
-
-    # --- Declaraciones y asignaciones ---
+    # =========================
+    # Declaraciones y asignaciones
+    # =========================
 
     def p_declaration(self, p):
         'declaration : type_spec ID decl_tail'
@@ -146,18 +153,18 @@ class Parser:
         p[0] = [p[1]] + p[3]
 
     def p_assignment(self, p):
-        'assignment : lvalue ASSIGN expression'
+        'assignment : postfix_expression ASSIGN expression'
         p[0] = ('assign', p[1], p[3])
 
     def p_lvalue_id(self, p):
         'lvalue : ID'
         p[0] = ('var', p[1])
 
-    def p_lvalue_field(self, p):
-        'lvalue : lvalue DOT ID'
-        p[0] = ('field_access', p[1], p[3])
 
-    # --- Print / break / return ---
+
+    # =========================
+    # Print / break / return
+    # =========================
 
     def p_print_stmt(self, p):
         'print_stmt : PRINT LPAREN expression RPAREN'
@@ -168,7 +175,7 @@ class Parser:
         p[0] = ('break',)
 
     def p_return_stmt_expr(self, p):
-        # return con valor — usado en funciones con tipo de retorno concreto
+    # return con valor — usado en funciones con tipo de retorno concreto
         'return_stmt : RETURN expression'
         p[0] = ('return', p[2])
 
@@ -177,7 +184,9 @@ class Parser:
         'return_stmt : RETURN'
         p[0] = ('return', None)
 
-    # ---Control de flujo ---
+    # =========================
+    # Control de flujo
+    # =========================
 
     def p_if_stmt(self, p):
         '''if_stmt : IF LPAREN expression RPAREN block
@@ -195,8 +204,9 @@ class Parser:
         'do_while_stmt : DO block WHILE LPAREN expression RPAREN'
         p[0] = ('do_while', p[2], p[5])
 
-
-    # --- Funciones y records ---
+    # =========================
+    # Funciones y records
+    # =========================
 
     def p_function_decl_typed(self, p):
         # Función con tipo de retorno concreto (int, float, char, boolean, o registro)
@@ -252,8 +262,9 @@ class Parser:
         'field : type_spec ID'
         p[0] = (p[1], p[2])
 
-
-    # --- Tipos ---
+    # =========================
+    # Tipos
+    # =========================
 
     def p_type_spec_basic(self, p):
         '''type_spec : INT
@@ -267,7 +278,9 @@ class Parser:
         # Los tipos de registro definidos por el usuario salen del lexer como ID
         p[0] = ('type_id', p[1])
 
-    # ---Expresiones ---
+    # =========================
+    # Expresiones
+    # =========================
 
     def p_expression_binary(self, p):
         '''expression : expression PLUS expression
@@ -293,11 +306,24 @@ class Parser:
         'expression : postfix_expression'
         p[0] = p[1]
 
-    def p_postfix_expression_primary(self, p):
+    def p_postfix_from_primary(self, p):
+        # Literales, new y expresiones entre paréntesis entran por aquí
         'postfix_expression : primary_expression'
         p[0] = p[1]
 
+    def p_postfix_from_lvalue(self, p):
+        # Los identificadores (ID y accesos con punto) entran siempre por lvalue.
+        # Esto elimina el conflicto R/R: antes había dos reglas que competían por ID
+        # (lvalue → ID  vs  primary_expression → ID). Ahora ID siempre reduce a lvalue
+        # y lvalue sube a postfix_expression, sin ambigüedad.
+        'postfix_expression : lvalue'
+        p[0] = p[1]
+
     def p_postfix_expression_field(self, p):
+        # Acceso a campo: a.b.c — el DOT vive aquí, no en lvalue.
+        # Esto elimina los conflictos S/R: antes lvalue tenía su propio DOT
+        # y también alimentaba postfix_expression, lo que creaba ambigüedad.
+        # Ahora lvalue solo reconoce ID y DOT solo existe en postfix_expression.
         'postfix_expression : postfix_expression DOT ID'
         p[0] = ('field_access', p[1], p[3])
 
@@ -308,10 +334,6 @@ class Parser:
     def p_primary_literal(self, p):
         'primary_expression : literal'
         p[0] = p[1]
-
-    def p_primary_id(self, p):
-        'primary_expression : ID'
-        p[0] = ('var', p[1])
 
     def p_primary_new(self, p):
         'primary_expression : NEW ID LPAREN argument_list_opt RPAREN'
@@ -342,12 +364,17 @@ class Parser:
                    | FALSE'''
         p[0] = ('const', p[1])
 
+    # =========================
     # Vacío
+    # =========================
+
     def p_lambda(self, p):
         'lambda :'
         p[0] = None
 
-    # --- Errores ---
+    # =========================
+    # Errores
+    # =========================
 
     def p_error(self, p):
         self.has_errors = True
@@ -359,7 +386,10 @@ class Parser:
         col = getattr(p, 'col_start', '?')
         print(f"[ERROR] Token '{p.type}' inesperado en la línea {p.lineno}, columna {col}")
 
+    # =========================
     # API pública
+    # =========================
+
     def parse(self, input_text):
         self.has_errors = False
         self.lexer.input(input_text)
