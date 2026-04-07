@@ -5,8 +5,7 @@ from lexer import Lexer
 class Parser:
     def __init__(self):
         self.lexer = Lexer()
-        self.has_errors = False
-        self.parser = yacc.yacc(module=self, write_tables=False, debug=False, errorlog=yacc.NullLogger())
+        self.parser = yacc.yacc(module=self)
 
     tokens = Lexer.tokens
     start = 'program'
