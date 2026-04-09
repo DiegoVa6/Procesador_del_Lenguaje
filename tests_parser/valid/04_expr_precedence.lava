@@ -1,0 +1,9 @@
+int a;
+float b;
+boolean c;
+a = 1 + 2 * 3;
+b = (1 + 2) * 3.0;
+c = 1 < 2 || 3 < 4 && !false;
+print(a);
+print(b);
+print(c);

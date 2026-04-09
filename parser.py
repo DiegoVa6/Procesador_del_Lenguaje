@@ -153,13 +153,16 @@ class Parser:
         p[0] = [p[1]] + p[3]
 
     def p_assignment(self, p):
-        'assignment : postfix_expression ASSIGN expression'
+        'assignment : lvalue ASSIGN expression'
         p[0] = ('assign', p[1], p[3])
 
     def p_lvalue_id(self, p):
         'lvalue : ID'
         p[0] = ('var', p[1])
 
+    def p_lvalue_field(self, p):
+        'lvalue : lvalue DOT ID'
+        p[0] = ('field_access', p[1], p[3])
 
 
     # =========================
@@ -201,7 +204,7 @@ class Parser:
         p[0] = ('while', p[3], p[5])
 
     def p_do_while_stmt(self, p):
-        'do_while_stmt : DO block WHILE LPAREN expression RPAREN'
+        'do_while_stmt : DO block WHILE LPAREN expression RPAREN SEMICOLON'
         p[0] = ('do_while', p[2], p[5])
 
     # =========================
@@ -319,16 +322,8 @@ class Parser:
         'postfix_expression : lvalue'
         p[0] = p[1]
 
-    def p_postfix_expression_field(self, p):
-        # Acceso a campo: a.b.c — el DOT vive aquí, no en lvalue.
-        # Esto elimina los conflictos S/R: antes lvalue tenía su propio DOT
-        # y también alimentaba postfix_expression, lo que creaba ambigüedad.
-        # Ahora lvalue solo reconoce ID y DOT solo existe en postfix_expression.
-        'postfix_expression : postfix_expression DOT ID'
-        p[0] = ('field_access', p[1], p[3])
-
     def p_postfix_expression_call(self, p):
-        'postfix_expression : postfix_expression LPAREN argument_list_opt RPAREN'
+        'postfix_expression : ID LPAREN argument_list_opt RPAREN'
         p[0] = ('call', p[1], p[3])
 
     def p_primary_literal(self, p):

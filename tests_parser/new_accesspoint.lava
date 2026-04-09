@@ -1,2 +1,0 @@
-Point p = new Point(1, 2);
-p.x;

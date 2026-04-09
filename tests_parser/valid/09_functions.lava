@@ -1,0 +1,11 @@
+int square(int x) {
+    return x * x;
+}
+
+void show(int x) {
+    print(x);
+}
+
+int a;
+a = square(4);
+show(a);
