@@ -3,14 +3,39 @@ from lexer import Lexer
 
 
 class Parser:
-    def __init__(self):
-        self.lexer = Lexer()
-        self.parser = yacc.yacc(module=self)
+
+    # ------------------------------------------------------------------
+    # Atributos de clase
+    # ------------------------------------------------------------------
+
+    symbols = {}
+
+    default_types = {
+        'int':     0,
+        'float':   0.0,
+        'char':    '',
+        'boolean': False,
+    }
+
+    widening_order = ['char', 'int', 'float']
+
+    op_types = {
+        '+':  {'int': 'int',     'float': 'float',   'char': 'char'},
+        '-':  {'int': 'int',     'float': 'float',   'char': 'char'},
+        '*':  {'int': 'int',     'float': 'float'},
+        '/':  {'int': 'int',     'float': 'float'},
+        '>':  {'int': 'boolean', 'float': 'boolean', 'char': 'boolean'},
+        '>=': {'int': 'boolean', 'float': 'boolean', 'char': 'boolean'},
+        '<':  {'int': 'boolean', 'float': 'boolean', 'char': 'boolean'},
+        '<=': {'int': 'boolean', 'float': 'boolean', 'char': 'boolean'},
+        '==': {'int': 'boolean', 'float': 'boolean', 'char': 'boolean', 'boolean': 'boolean'},
+        '&&': {'boolean': 'boolean'},
+        '||': {'boolean': 'boolean'},
+    }
 
     tokens = Lexer.tokens
     start = 'program'
 
-    # De menor a mayor precedencia
     precedence = (
         ('left', 'OR'),
         ('left', 'AND'),
@@ -21,9 +46,17 @@ class Parser:
         ('right', 'UMINUS', 'UPLUS'),
     )
 
-    # =========================
+    # ------------------------------------------------------------------
+    # Constructor mínimo
+    # ------------------------------------------------------------------
+
+    def __init__(self):
+        self.lexer = Lexer()
+        self.parser = yacc.yacc(module=self)
+
+    # ==================================================================
     # Programa
-    # =========================
+    # ==================================================================
 
     def p_program(self, p):
         'program : top_list_opt'
@@ -40,7 +73,6 @@ class Parser:
 
     def p_top_list_rec(self, p):
         'top_list : top_list top_item'
-        # Filtramos None para no añadir nodos de ; sueltos al AST
         if p[2] is not None:
             p[1].append(p[2])
         p[0] = p[1]
@@ -52,16 +84,13 @@ class Parser:
                     | function_decl
                     | record_decl SEMICOLON'''
         if len(p) == 2:
-            if p.slice[1].type == 'SEMICOLON':
-                p[0] = ('empty_stmt',)
-            else:
-                p[0] = p[1]
+            p[0] = ('empty_stmt',) if p.slice[1].type == 'SEMICOLON' else p[1]
         else:
             p[0] = p[1]
 
-    # =========================
+    # ==================================================================
     # Bloques
-    # =========================
+    # ==================================================================
 
     def p_block(self, p):
         'block : LBRACE block_items_opt RBRACE'
@@ -78,7 +107,6 @@ class Parser:
 
     def p_block_items_rec(self, p):
         'block_items : block_items block_item'
-        # Filtramos None para no añadir nodos de ; sueltos al AST
         if p[2] is not None:
             p[1].append(p[2])
         p[0] = p[1]
@@ -88,16 +116,13 @@ class Parser:
                       | simple_statement SEMICOLON
                       | compound_statement'''
         if len(p) == 2:
-            if p.slice[1].type == 'SEMICOLON':
-                p[0] = ('empty_stmt',)
-            else:
-                p[0] = p[1]
+            p[0] = ('empty_stmt',) if p.slice[1].type == 'SEMICOLON' else p[1]
         else:
             p[0] = p[1]
 
-    # =========================
+    # ==================================================================
     # Sentencias
-    # =========================
+    # ==================================================================
 
     def p_simple_statement(self, p):
         '''simple_statement : declaration
@@ -114,24 +139,48 @@ class Parser:
                               | do_while_stmt'''
         p[0] = p[1]
 
-    # =========================
-    # Declaraciones y asignaciones
-    # =========================
+    # ==================================================================
+    # Declaración
+    # ==================================================================
 
     def p_declaration(self, p):
         'declaration : type_spec ID decl_tail'
-        # decl_tail puede ser:
-        # None                        -> declaración simple
-        # ('init', expr)              -> declaración con inicialización
-        # ('multi', [id2, id3, ...])  -> multideclaración
+        typ  = p[1]
+        name = p[2]
         tail = p[3]
 
         if tail is None:
-            p[0] = ('decl', p[1], [p[2]])
+            # int x;
+            if name in self.symbols:
+                print(f"[ERROR SEMÁNTICO] La variable '{name}' ya ha sido declarada previamente")
+            else:
+                self.symbols[name] = (typ, self.default_types.get(typ))
+            p[0] = ('decl', typ, [name])
+
         elif tail[0] == 'init':
-            p[0] = ('decl_init', p[1], p[2], tail[1])
+            # int x = 5;
+            expr     = tail[1]   # (tipo, valor)
+            expr_typ = expr[0]
+
+            if name in self.symbols:
+                print(f"[ERROR SEMÁNTICO] La variable '{name}' ya ha sido declarada previamente")
+            elif not self._compatible(typ, expr_typ):
+                print(f"[ERROR SEMÁNTICO] No se puede inicializar '{name}' (tipo '{typ}') "
+                      f"con una expresión de tipo '{expr_typ}'")
+                self.symbols[name] = (typ, self.default_types.get(typ))
+            else:
+                self.symbols[name] = (typ, expr[1])
+            p[0] = ('decl_init', typ, name, expr)
+
         else:
-            p[0] = ('decl', p[1], [p[2]] + tail[1])
+            # int a, b;
+            ids = [name] + tail[1]
+            for n in ids:
+                if n in self.symbols:
+                    print(f"[ERROR SEMÁNTICO] La variable '{n}' ya ha sido declarada previamente")
+                else:
+                    self.symbols[n] = (typ, self.default_types.get(typ))
+            p[0] = ('decl', typ, ids)
 
     def p_decl_tail(self, p):
         '''decl_tail : lambda
@@ -152,9 +201,26 @@ class Parser:
         'id_list_tail : ID COMMA id_list_tail'
         p[0] = [p[1]] + p[3]
 
+    # ==================================================================
+    # Asignación
+    # ==================================================================
+
     def p_assignment(self, p):
         'assignment : lvalue ASSIGN expression'
-        p[0] = ('assign', p[1], p[3])
+        lval     = p[1]
+        expr     = p[3]   # (tipo, valor)
+        lval_typ = self._lvalue_type(lval)
+        expr_typ = expr[0]
+
+        if lval_typ is not None and expr_typ is not None:
+            if not self._compatible(lval_typ, expr_typ):
+                print(f"[ERROR SEMÁNTICO] No se puede asignar '{expr_typ}' "
+                      f"a variable de tipo '{lval_typ}'")
+            else:
+                if lval[0] == 'var' and lval[1] in self.symbols:
+                    self.symbols[lval[1]] = (lval_typ, expr[1])
+
+        p[0] = ('assign', lval, expr)
 
     def p_lvalue_id(self, p):
         'lvalue : ID'
@@ -164,10 +230,9 @@ class Parser:
         'lvalue : lvalue DOT ID'
         p[0] = ('field_access', p[1], p[3])
 
-
-    # =========================
+    # ==================================================================
     # Print / break / return
-    # =========================
+    # ==================================================================
 
     def p_print_stmt(self, p):
         'print_stmt : PRINT LPAREN expression RPAREN'
@@ -178,54 +243,62 @@ class Parser:
         p[0] = ('break',)
 
     def p_return_stmt_expr(self, p):
-    # return con valor — usado en funciones con tipo de retorno concreto
         'return_stmt : RETURN expression'
         p[0] = ('return', p[2])
 
     def p_return_stmt_void(self, p):
-        # return vacío — solo válido en funciones void (se comprobará en P3)
         'return_stmt : RETURN'
         p[0] = ('return', None)
 
-    # =========================
+    # ==================================================================
     # Control de flujo
-    # =========================
+    # ==================================================================
 
     def p_if_stmt(self, p):
         '''if_stmt : IF LPAREN expression RPAREN block
                    | IF LPAREN expression RPAREN block ELSE block'''
+        cond = p[3]   # (tipo, valor)
+
+        if cond[0] != 'boolean':
+            print(f"[ERROR SEMÁNTICO] La condición del 'if' debe ser 'boolean', "
+                  f"se encontró '{cond[0]}' (línea {p.lineno(1)})")
+
         if len(p) == 6:
-            p[0] = ('if', p[3], p[5], None)
+            p[0] = ('if', cond, p[5], None)
         else:
-            p[0] = ('if', p[3], p[5], p[7])
+            p[0] = ('if', cond, p[5], p[7])
 
     def p_while_stmt(self, p):
         'while_stmt : WHILE LPAREN expression RPAREN block'
-        p[0] = ('while', p[3], p[5])
+        cond = p[3]   # (tipo, valor)
+
+        if cond[0] != 'boolean':
+            print(f"[ERROR SEMÁNTICO] La condición del 'while' debe ser 'boolean', "
+                  f"se encontró '{cond[0]}' (línea {p.lineno(1)})")
+
+        p[0] = ('while', cond, p[5])
 
     def p_do_while_stmt(self, p):
         'do_while_stmt : DO block WHILE LPAREN expression RPAREN SEMICOLON'
-        p[0] = ('do_while', p[2], p[5])
+        cond = p[5]   # (tipo, valor)
 
-    # =========================
-    # Funciones y records
-    # =========================
+        if cond[0] != 'boolean':
+            print(f"[ERROR SEMÁNTICO] La condición del 'do-while' debe ser 'boolean', "
+                  f"se encontró '{cond[0]}' (línea {p.lineno(1)})")
+
+        p[0] = ('do_while', p[2], cond)
+
+    # ==================================================================
+    # Funciones y records  (semántica completa en P3-parte2)
+    # ==================================================================
 
     def p_function_decl_typed(self, p):
-        # Función con tipo de retorno concreto (int, float, char, boolean, o registro)
-        # Se separa de void para eliminar el conflicto reduce/reduce:
-        # con return_type unificado, el parser no podía distinguir entre
-        # "int f(...)" (función) y "int a" (declaración de variable) con un
-        # solo token de lookahead.
         'function_decl : type_spec ID LPAREN param_list_opt RPAREN block'
         p[0] = ('func_decl', p[1], p[2], p[4], p[6])
 
     def p_function_decl_void(self, p):
-        # Función void: VOID no pertenece a type_spec, por lo que no hay
-        # ambigüedad y puede seguir siendo una regla independiente.
         'function_decl : VOID ID LPAREN param_list_opt RPAREN block'
         p[0] = ('func_decl', 'void', p[2], p[4], p[6])
-
 
     def p_param_list_opt(self, p):
         '''param_list_opt : param_list
@@ -265,9 +338,9 @@ class Parser:
         'field : type_spec ID'
         p[0] = (p[1], p[2])
 
-    # =========================
+    # ==================================================================
     # Tipos
-    # =========================
+    # ==================================================================
 
     def p_type_spec_basic(self, p):
         '''type_spec : INT
@@ -278,12 +351,11 @@ class Parser:
 
     def p_type_spec_record(self, p):
         'type_spec : ID'
-        # Los tipos de registro definidos por el usuario salen del lexer como ID
         p[0] = ('type_id', p[1])
 
-    # =========================
-    # Expresiones
-    # =========================
+    # ==================================================================
+    # Expresiones — devuelven (tipo, valor)
+    # ==================================================================
 
     def p_expression_binary(self, p):
         '''expression : expression PLUS expression
@@ -297,42 +369,69 @@ class Parser:
                       | expression LT expression
                       | expression LE expression
                       | expression EQ expression'''
-        p[0] = ('binop', p[2], p[1], p[3])
+        left  = p[1]   # (tipo, valor)
+        op    = p[2]
+        right = p[3]   # (tipo, valor)
+
+        t_res = self._check_binop(op, left[0], right[0])
+
+        if t_res is None:
+            print(f"[ERROR SEMÁNTICO] Operación '{op}' no válida entre "
+                  f"'{left[0]}' y '{right[0]}' (línea {p.lineno(2)})")
+            p[0] = (None, None)
+        else:
+            p[0] = (t_res, None)
 
     def p_expression_unary(self, p):
         '''expression : MINUS expression %prec UMINUS
                       | PLUS expression %prec UPLUS
                       | NOT expression'''
-        p[0] = ('unop', p[1], p[2])
+        op   = p[1]
+        expr = p[2]   # (tipo, valor)
+
+        t_res = self._check_unop(op, expr[0])
+
+        if t_res is None:
+            print(f"[ERROR SEMÁNTICO] Operador '{op}' no válido sobre "
+                  f"'{expr[0]}' (línea {p.lineno(1)})")
+            p[0] = (None, None)
+        else:
+            val = None
+            if expr[1] is not None:
+                if op == '-':   val = -expr[1]
+                elif op == '+': val = expr[1]
+                elif op == '!': val = not expr[1]
+            p[0] = (t_res, val)
 
     def p_expression_postfix(self, p):
         'expression : postfix_expression'
         p[0] = p[1]
 
+    # ------------------------------------------------------------------
+    # Cadena lvalue -> postfix -> expression
+    # Se mantiene de P2 para resolver el conflicto reduce/reduce con ID
+    # ------------------------------------------------------------------
+
     def p_postfix_from_primary(self, p):
-        # Literales, new y expresiones entre paréntesis entran por aquí
         'postfix_expression : primary_expression'
         p[0] = p[1]
 
     def p_postfix_from_lvalue(self, p):
-        # Los identificadores (ID y accesos con punto) entran siempre por lvalue.
-        # Esto elimina el conflicto R/R: antes había dos reglas que competían por ID
-        # (lvalue → ID  vs  primary_expression → ID). Ahora ID siempre reduce a lvalue
-        # y lvalue sube a postfix_expression, sin ambigüedad.
         'postfix_expression : lvalue'
-        p[0] = p[1]
+        lval = p[1]
+        t    = self._lvalue_type(lval)
+        val  = self.symbols[lval[1]][1] if lval[0] == 'var' and lval[1] in self.symbols else None
+        p[0] = (t, val)
 
     def p_postfix_expression_call(self, p):
         'postfix_expression : ID LPAREN argument_list_opt RPAREN'
-        p[0] = ('call', p[1], p[3])
-
-    def p_primary_literal(self, p):
-        'primary_expression : literal'
-        p[0] = p[1]
+        # Semántica de llamadas a función: P3-parte2
+        p[0] = (None, None)
 
     def p_primary_new(self, p):
         'primary_expression : NEW ID LPAREN argument_list_opt RPAREN'
-        p[0] = ('new', p[2], p[4])
+        # Semántica de registros: P3-parte2
+        p[0] = (('type_id', p[2]), None)
 
     def p_primary_group(self, p):
         'primary_expression : LPAREN expression RPAREN'
@@ -351,47 +450,108 @@ class Parser:
         'argument_list : argument_list COMMA expression'
         p[0] = p[1] + [p[3]]
 
-    def p_literal(self, p):
-        '''literal : INT_VALUE
-                   | FLOAT_VALUE
-                   | CHAR_VALUE
-                   | TRUE
-                   | FALSE'''
-        p[0] = ('const', p[1])
+    # ------------------------------------------------------------------
+    # Literales — directos a expression, una función por tipo (estilo profesor)
+    # ------------------------------------------------------------------
 
-    # =========================
+    def p_literal_int_expression(self, p):
+        'expression : INT_VALUE'
+        p[0] = ('int', p[1])
+
+    def p_literal_float_expression(self, p):
+        'expression : FLOAT_VALUE'
+        p[0] = ('float', p[1])
+
+    def p_literal_char_expression(self, p):
+        'expression : CHAR_VALUE'
+        p[0] = ('char', p[1])
+
+    def p_literal_bool_expression(self, p):
+        '''expression : TRUE
+                      | FALSE'''
+        p[0] = ('boolean', p[1])
+
+    # ==================================================================
     # Vacío
-    # =========================
+    # ==================================================================
 
     def p_lambda(self, p):
         'lambda :'
         p[0] = None
 
-    # =========================
-    # Errores
-    # =========================
+    # ==================================================================
+    # Error sintáctico
+    # ==================================================================
 
     def p_error(self, p):
         self.has_errors = True
-
         if p is None:
-            print("[ERROR] Fin de fichero inesperado")
+            print("[ERROR SINTÁCTICO] Fin de fichero inesperado")
             return
-
         col = getattr(p, 'col_start', '?')
-        print(f"[ERROR] Token '{p.type}' inesperado en la línea {p.lineno}, columna {col}")
+        print(f"[ERROR SINTÁCTICO] Token '{p.type}' inesperado "
+              f"en línea {p.lineno}, columna {col}")
 
-    # =========================
+    # ==================================================================
     # API pública
-    # =========================
+    # ==================================================================
 
     def parse(self, input_text):
         self.has_errors = False
+        self.symbols = {}
         self.lexer.input(input_text)
-
         return self.parser.parse(
             input=input_text,
-            lexer=self.lexer.lexer,      # lexer interno de PLY, sí tiene lineno
-            tokenfunc=self.lexer.token,  # seguimos usando tu token() para columnas
+            lexer=self.lexer.lexer,
+            tokenfunc=self.lexer.token,
             tracking=True
         )
+
+    # ==================================================================
+    # Métodos privados de ayuda semántica
+    # ==================================================================
+
+    def _compatible(self, dest, src):
+        """True si src puede asignarse a dest (igual o widening permitido)."""
+        if dest == src:
+            return True
+        if dest in self.widening_order and src in self.widening_order:
+            return self.widening_order.index(src) <= self.widening_order.index(dest)
+        return False
+
+    def _widen(self, t1, t2):
+        """Tipo más general entre t1 y t2, o None si incompatibles."""
+        if t1 == t2:
+            return t1
+        if t1 in self.widening_order and t2 in self.widening_order:
+            return self.widening_order[max(self.widening_order.index(t1),
+                                          self.widening_order.index(t2))]
+        return None
+
+    def _check_binop(self, op, t1, t2):
+        """Tipo resultado de op sobre t1 y t2 con widening. None si inválido."""
+        w = self._widen(t1, t2)
+        if w is not None and w in self.op_types.get(op, {}):
+            return self.op_types[op][w]
+        return None
+
+    def _check_unop(self, op, t):
+        """Tipo resultado del operador unario op sobre tipo t. None si inválido."""
+        if op in ('+', '-') and t in ('int', 'float', 'char'):
+            return t
+        if op == '!' and t == 'boolean':
+            return 'boolean'
+        return None
+
+    def _lvalue_type(self, lval):
+        """Tipo de un lvalue desde self.symbols. field_access: P3-parte2."""
+        if lval[0] == 'var':
+            name = lval[1]
+            if name not in self.symbols:
+                print(f"[ERROR SEMÁNTICO] La variable '{name}' no ha sido declarada previamente")
+                return None
+            return self.symbols[name][0]
+        elif lval[0] == 'field_access':
+            return None   # se completará con la tabla de registros
+        return None
+    
