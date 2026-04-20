@@ -284,10 +284,61 @@ class Parser:
 
     def p_return_stmt_expr(self, p):
         'return_stmt : RETURN expression'
-        p[0] = ('return', p[2])
+        expr = p[2]
+
+        if self.current_function is None:
+            self._semantic_error(
+                f"'return' solo puede usarse dentro de una función (línea {p.lineno(1)})"
+            )
+            p[0] = ('return', expr)
+            return
+
+        self.current_function['return_stmt_seen'] = True
+
+        function_name = self.current_function['name']
+        return_type = self.current_function['return_type']
+        expr_type = self._type_name(expr[0])
+
+        if return_type == 'void':
+            self._semantic_error(
+                f"La función void '{function_name}' no puede devolver un valor "
+                f"(línea {p.lineno(1)})"
+            )
+        elif not self._compatible(return_type, expr_type):
+            self._semantic_error(
+                f"La función '{function_name}' debe devolver '{return_type}', "
+                f"pero devuelve '{expr_type}' (línea {p.lineno(1)})"
+            )
+        else:
+            self.current_function['return_seen'] = True
+
+        p[0] = ('return', expr)
 
     def p_return_stmt_void(self, p):
         'return_stmt : RETURN'
+
+        if self.current_function is None:
+            self._semantic_error(
+                f"'return' solo puede usarse dentro de una función (línea {p.lineno(1)})"
+            )
+            p[0] = ('return', None)
+            return
+
+        self.current_function['return_stmt_seen'] = True
+        function_name = self.current_function['name']
+        return_type = self.current_function['return_type']
+
+        if return_type == 'void':
+            self._semantic_error(
+                f"La función void '{function_name}' no puede incluir return "
+                f"(línea {p.lineno(1)})"
+            )
+        else:
+            self._semantic_error(
+                f"La función '{function_name}' debe devolver un valor de tipo "
+                f"'{return_type}' (línea {p.lineno(1)})"
+            )
+
         p[0] = ('return', None)
 
     # ==================================================================
@@ -346,13 +397,61 @@ class Parser:
     # Funciones y records  (semántica completa en P3-parte2)
     # ==================================================================
 
-    def p_function_decl_typed(self, p):
-        'function_decl : type_spec ID LPAREN param_list_opt RPAREN block'
-        p[0] = ('func_decl', p[1], p[2], p[4], p[6])
+    def p_function_decl(self, p):
+        'function_decl : function_header block'
+        header = p[1]
+        block = p[2]
 
-    def p_function_decl_void(self, p):
-        'function_decl : VOID ID LPAREN param_list_opt RPAREN block'
-        p[0] = ('func_decl', 'void', p[2], p[4], p[6])
+        # Al terminar de analizar el bloque, todavía estamos dentro de la función.
+        # Por eso aquí podemos comprobar si se ha visto un return.
+        if header['valid'] and header['return_type'] != 'void':
+            if (
+                self.current_function is not None
+                and not self.current_function['return_seen']
+                and not self.current_function['return_stmt_seen']
+            ):
+                self._semantic_error(
+                    f"La función '{header['name']}' debe devolver un valor de tipo "
+                    f"'{header['return_type']}'"
+                )
+
+        # Restauramos los símbolos globales.
+        self._exit_function_scope()
+
+        # Registramos la función después de analizarla.
+        if header['valid']:
+            self.functions.setdefault(header['name'], []).append({
+                'params': header['params'],
+                'return': header['return_type']
+            })
+
+        p[0] = (
+            'func_decl',
+            header['return_type'],
+            header['name'],
+            header['params'],
+            block
+        )
+
+    def p_function_header_typed(self, p):
+        'function_header : type_spec ID LPAREN param_list_opt RPAREN'
+        return_type = self._type_name(p[1])
+        name = p[2]
+        params = p[4]
+
+        header = self._build_function_header(return_type, name, params)
+        self._enter_function_scope(header)
+        p[0] = header
+
+    def p_function_header_void(self, p):
+        'function_header : VOID ID LPAREN param_list_opt RPAREN'
+        return_type = 'void'
+        name = p[2]
+        params = p[4]
+
+        header = self._build_function_header(return_type, name, params)
+        self._enter_function_scope(header)
+        p[0] = header
 
     def p_param_list_opt(self, p):
         '''param_list_opt : param_list
@@ -520,8 +619,15 @@ class Parser:
 
     def p_postfix_expression_call(self, p):
         'postfix_expression : ID LPAREN argument_list_opt RPAREN'
-        # Semántica de llamadas a función: P3-parte2
-        p[0] = (None, None)
+        function_name = p[1]
+        args = p[3]
+
+        return_type = self._resolve_function_call(function_name, args, p.lineno(1))
+
+        if return_type is None:
+            p[0] = (None, None)
+        else:
+            p[0] = (return_type, None)
 
     def p_primary_new(self, p):
         'primary_expression : NEW ID LPAREN argument_list_opt RPAREN'
@@ -632,6 +738,8 @@ class Parser:
         self.records = {}
         self.functions = {}
         self.loop_depth = 0
+        self.function_scope_stack = []
+        self.current_function = None
 
         self.lexer.input(input_text)
         return self.parser.parse(
@@ -815,3 +923,143 @@ class Parser:
                 base_value[field_name] = new_value
 
             return
+
+    def _build_function_header(self, return_type, name, params):
+        """Valida y prepara la cabecera de una función."""
+        valid = True
+        processed_params = []
+        param_names = set()
+
+        if return_type != 'void' and not self._type_exists(return_type):
+            self._semantic_error(
+                f"El tipo de retorno '{return_type}' de la función '{name}' no existe"
+            )
+            valid = False
+
+        for param_type, param_name in params:
+            param_type_name = self._type_name(param_type)
+
+            if param_name in param_names:
+                self._semantic_error(
+                    f"El parámetro '{param_name}' está repetido en la función '{name}'"
+                )
+                valid = False
+            else:
+                param_names.add(param_name)
+
+            if not self._type_exists(param_type):
+                self._semantic_error(
+                    f"El tipo '{param_type_name}' del parámetro '{param_name}' "
+                    f"no existe en la función '{name}'"
+                )
+                valid = False
+
+            processed_params.append((param_type_name, param_name))
+
+        param_types = [param_type for param_type, _ in processed_params]
+
+        if self._function_signature_exists(name, param_types):
+            self._semantic_error(
+                f"La función '{name}' con parámetros {param_types} "
+                f"ya ha sido declarada previamente"
+            )
+            valid = False
+
+        return {
+            'name': name,
+            'return_type': return_type,
+            'params': processed_params,
+            'valid': valid
+        }
+
+    def _function_signature_exists(self, name, param_types):
+        """True si ya existe una función con mismo nombre y mismos tipos de parámetros."""
+        for function in self.functions.get(name, []):
+            existing_param_types = [param_type for param_type, _ in function['params']]
+            if existing_param_types == param_types:
+                return True
+        return False
+
+    def _enter_function_scope(self, header):
+        """Crea un ámbito local para analizar el cuerpo de una función."""
+        self.function_scope_stack.append((self.symbols.copy(), self.current_function))
+
+        self.current_function = {
+            'name': header['name'],
+            'return_type': header['return_type'],
+            'return_seen': False,
+            'return_stmt_seen': False
+        }
+
+        for param_type, param_name in header['params']:
+            if param_name not in self.symbols:
+                self.symbols[param_name] = (param_type, self._default_value(param_type))
+
+    def _exit_function_scope(self):
+        """Restaura los símbolos que había antes de entrar en la función."""
+        if self.function_scope_stack:
+            self.symbols, self.current_function = self.function_scope_stack.pop()
+
+    def _resolve_function_call(self, name, args, line):
+        """Devuelve el tipo de retorno de una llamada a función, o None si es inválida."""
+        if self.current_function is not None and self.current_function['name'] == name:
+            self._semantic_error(
+                f"No se permite recursión directa en la función '{name}' (línea {line})"
+            )
+            return None
+
+        if name not in self.functions:
+            self._semantic_error(
+                f"La función '{name}' no ha sido declarada previamente (línea {line})"
+            )
+            return None
+
+        arg_types = [self._type_name(arg[0]) for arg in args]
+        candidates = self.functions[name]
+
+        # 1. Buscar coincidencia exacta de tipos.
+        exact_matches = []
+
+        for function in candidates:
+            param_types = [param_type for param_type, _ in function['params']]
+
+            if param_types == arg_types:
+                exact_matches.append(function)
+
+        if len(exact_matches) == 1:
+            return exact_matches[0]['return']
+
+        # 2. Si no hay coincidencia exacta, buscar coincidencias compatibles con conversiones.
+        compatible_matches = []
+
+        for function in candidates:
+            param_types = [param_type for param_type, _ in function['params']]
+
+            if len(param_types) != len(arg_types):
+                continue
+
+            compatible = True
+
+            for param_type, arg_type in zip(param_types, arg_types):
+                if not self._compatible(param_type, arg_type):
+                    compatible = False
+                    break
+
+            if compatible:
+                compatible_matches.append(function)
+
+        if len(compatible_matches) == 1:
+            return compatible_matches[0]['return']
+
+        if len(compatible_matches) > 1:
+            self._semantic_error(
+                f"La llamada a la función '{name}' con argumentos {arg_types} "
+                f"es ambigua (línea {line})"
+            )
+            return None
+
+        self._semantic_error(
+            f"No existe ninguna función '{name}' compatible con argumentos "
+            f"{arg_types} (línea {line})"
+        )
+        return None
