@@ -254,8 +254,7 @@ class Parser:
                     f"No se puede asignar '{expr_typ}' a variable de tipo '{lval_typ}'"
                 )
             else:
-                if lval[0] == 'var' and lval[1] in self.symbols:
-                    self.symbols[lval[1]] = (lval_typ, expr[1])
+                self._set_lvalue_value(lval, expr[1])
 
         p[0] = ('assign', lval, expr)
 
@@ -516,7 +515,7 @@ class Parser:
         'postfix_expression : lvalue'
         lval = p[1]
         t    = self._lvalue_type(lval)
-        val  = self.symbols[lval[1]][1] if lval[0] == 'var' and lval[1] in self.symbols else None
+        val  = self._get_lvalue_value(lval)
         p[0] = (t, val)
 
     def p_postfix_expression_call(self, p):
@@ -717,16 +716,102 @@ class Parser:
         return None
 
     def _lvalue_type(self, lval):
-        """Tipo de un lvalue desde self.symbols. field_access: P3-parte2."""
+        """Devuelve el tipo de un lvalue.
+
+        Ejemplos:
+            a       -> tipo de la variable a
+            p.x     -> tipo del campo x dentro del record de p
+            l.a.x   -> tipo del campo x dentro del campo a de l
+        """
         if lval[0] == 'var':
             name = lval[1]
+
             if name not in self.symbols:
                 self._semantic_error(
                     f"La variable '{name}' no ha sido declarada previamente"
                 )
                 return None
+
             return self.symbols[name][0]
+
         elif lval[0] == 'field_access':
-            return None   # se completará con la tabla de registros
+            base_lval = lval[1]
+            field_name = lval[2]
+
+            base_type = self._lvalue_type(base_lval)
+
+            if base_type is None:
+                return None
+
+            base_type_name = self._type_name(base_type)
+
+            if base_type_name not in self.records:
+                self._semantic_error(
+                    f"No se puede acceder al campo '{field_name}' "
+                    f"porque '{base_type_name}' no es un record"
+                )
+                return None
+
+            for field_type, current_field_name in self.records[base_type_name]:
+                if current_field_name == field_name:
+                    return field_type
+
+            self._semantic_error(
+                f"El record '{base_type_name}' no tiene un campo llamado '{field_name}'"
+            )
+            return None
+
         return None
-    
+
+    def _get_lvalue_value(self, lval):
+        """Devuelve el valor actual de un lvalue.
+
+        Ejemplos:
+            a       -> valor de a
+            p.x     -> valor del campo x de p
+            l.a.x   -> valor del campo x dentro del campo a de l
+        """
+        if lval[0] == 'var':
+            name = lval[1]
+            if name in self.symbols:
+                return self.symbols[name][1]
+            return None
+
+        if lval[0] == 'field_access':
+            base_lval = lval[1]
+            field_name = lval[2]
+
+            base_value = self._get_lvalue_value(base_lval)
+
+            if isinstance(base_value, dict):
+                return base_value.get(field_name)
+
+            return None
+
+        return None
+
+    def _set_lvalue_value(self, lval, new_value):
+        """Actualiza el valor de un lvalue.
+
+        Ejemplos:
+            a = 3       -> cambia el valor de a
+            p.x = 10    -> cambia el campo x dentro de p
+            l.a.x = 10  -> cambia el campo x dentro del campo a de l
+        """
+        if lval[0] == 'var':
+            name = lval[1]
+            if name in self.symbols:
+                typ = self.symbols[name][0]
+                self.symbols[name] = (typ, new_value)
+            return
+
+        if lval[0] == 'field_access':
+            base_lval = lval[1]
+            field_name = lval[2]
+
+            base_value = self._get_lvalue_value(base_lval)
+
+            if isinstance(base_value, dict) and field_name in base_value:
+                base_value[field_name] = new_value
+
+            return
