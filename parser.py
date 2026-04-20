@@ -149,40 +149,74 @@ class Parser:
         name = p[2]
         tail = p[3]
 
+        # Normalizamos el tipo:
+        # 'int' se queda como 'int'
+        # ('type_id', 'Point') pasa a ser 'Point'
+        typ_name = self._type_name(typ)
+
+        # Comprobamos que el tipo exista:
+        # - básico: int, float, char, boolean
+        # - record previamente declarado: Point, Line, etc.
+        if not self._type_exists(typ):
+            self._semantic_error(
+                f"El tipo '{typ_name}' de la variable '{name}' no existe"
+            )
+            p[0] = ('decl', typ_name, [name])
+            return
+
         if tail is None:
+            # Ejemplo:
             # int x;
+            # Point p;
             if name in self.symbols:
-                self._semantic_error(f"La variable '{name}' ya ha sido declarada previamente")
+                self._semantic_error(
+                    f"La variable '{name}' ya ha sido declarada previamente"
+                )
             else:
-                self.symbols[name] = (typ, self.default_types.get(typ))
-            p[0] = ('decl', typ, [name])
+                self.symbols[name] = (typ_name, self._default_value(typ_name))
+
+            p[0] = ('decl', typ_name, [name])
 
         elif tail[0] == 'init':
+            # Ejemplo:
             # int x = 5;
+            # Point p = new Point(1, 2);
             expr     = tail[1]   # (tipo, valor)
             expr_typ = expr[0]
+            expr_typ_name = self._type_name(expr_typ)
 
             if name in self.symbols:
-                self._semantic_error(f"La variable '{name}' ya ha sido declarada previamente")
-            elif not self._compatible(typ, expr_typ):
                 self._semantic_error(
-                    f"No se puede inicializar '{name}' (tipo '{typ}') "
-                    f"con una expresión de tipo '{expr_typ}'"
+                    f"La variable '{name}' ya ha sido declarada previamente"
                 )
-                self.symbols[name] = (typ, self.default_types.get(typ))
+
+            elif not self._compatible(typ_name, expr_typ_name):
+                self._semantic_error(
+                    f"No se puede inicializar '{name}' (tipo '{typ_name}') "
+                    f"con una expresión de tipo '{expr_typ_name}'"
+                )
+                self.symbols[name] = (typ_name, self._default_value(typ_name))
+
             else:
-                self.symbols[name] = (typ, expr[1])
-            p[0] = ('decl_init', typ, name, expr)
+                self.symbols[name] = (typ_name, expr[1])
+
+            p[0] = ('decl_init', typ_name, name, expr)
 
         else:
+            # Ejemplo:
             # int a, b;
+            # Point p1, p2;
             ids = [name] + tail[1]
+
             for n in ids:
                 if n in self.symbols:
-                    self._semantic_error(f"La variable '{n}' ya ha sido declarada previamente")
+                    self._semantic_error(
+                        f"La variable '{n}' ya ha sido declarada previamente"
+                    )
                 else:
-                    self.symbols[n] = (typ, self.default_types.get(typ))
-            p[0] = ('decl', typ, ids)
+                    self.symbols[n] = (typ_name, self._default_value(typ_name))
+
+            p[0] = ('decl', typ_name, ids)
 
     def p_decl_tail(self, p):
         '''decl_tail : lambda
@@ -340,7 +374,44 @@ class Parser:
 
     def p_record_decl(self, p):
         'record_decl : RECORD ID LPAREN field_list_opt RPAREN'
-        p[0] = ('record_decl', p[2], p[4])
+        record_name = p[2]
+        fields = p[4]
+
+        if record_name in self.records:
+            self._semantic_error(
+                f"El record '{record_name}' ya ha sido declarado previamente"
+            )
+            p[0] = ('record_decl', record_name, fields)
+            return
+
+        field_names = set()
+        processed_fields = []
+        valid = True
+
+        for field_type, field_name in fields:
+            field_type_name = self._type_name(field_type)
+
+            if field_name in field_names:
+                self._semantic_error(
+                    f"El campo '{field_name}' está repetido en el record '{record_name}'"
+                )
+                valid = False
+            else:
+                field_names.add(field_name)
+
+            if not self._type_exists(field_type):
+                self._semantic_error(
+                    f"El tipo '{field_type_name}' del campo '{field_name}' "
+                    f"no existe en el record '{record_name}'"
+                )
+                valid = False
+
+            processed_fields.append((field_type_name, field_name))
+
+        if valid:
+            self.records[record_name] = processed_fields
+
+        p[0] = ('record_decl', record_name, processed_fields)
 
     def p_field_list_opt(self, p):
         '''field_list_opt : field_list
@@ -455,8 +526,43 @@ class Parser:
 
     def p_primary_new(self, p):
         'primary_expression : NEW ID LPAREN argument_list_opt RPAREN'
-        # Semántica de registros: P3-parte2
-        p[0] = (('type_id', p[2]), None)
+        record_name = p[2]
+        args = p[4]
+
+        if record_name not in self.records:
+            self._semantic_error(
+                f"El record '{record_name}' no ha sido declarado previamente"
+            )
+            p[0] = (record_name, None)
+            return
+
+        fields = self.records[record_name]
+
+        if len(args) != len(fields):
+            self._semantic_error(
+                f"El constructor de '{record_name}' espera {len(fields)} argumento(s), "
+                f"pero recibió {len(args)}"
+            )
+            p[0] = (record_name, self._default_value(record_name))
+            return
+
+        value = {}
+
+        for i, ((field_type, field_name), arg) in enumerate(zip(fields, args), start=1):
+            arg_type = arg[0]
+            arg_value = arg[1]
+            arg_type_name = self._type_name(arg_type)
+
+            if not self._compatible(field_type, arg_type_name):
+                self._semantic_error(
+                    f"El argumento {i} de '{record_name}' para el campo '{field_name}' "
+                    f"debe ser de tipo '{field_type}', pero se recibió '{arg_type_name}'"
+                )
+                value[field_name] = self._default_value(field_type)
+            else:
+                value[field_name] = arg_value
+
+        p[0] = (record_name, value)
 
     def p_primary_group(self, p):
         'primary_expression : LPAREN expression RPAREN'
@@ -524,7 +630,10 @@ class Parser:
     def parse(self, input_text):
         self.has_errors = False
         self.symbols = {}
+        self.records = {}
+        self.functions = {}
         self.loop_depth = 0
+
         self.lexer.input(input_text)
         return self.parser.parse(
             input=input_text,
@@ -556,6 +665,40 @@ class Parser:
         if t1 in self.widening_order and t2 in self.widening_order:
             return self.widening_order[max(self.widening_order.index(t1),
                                           self.widening_order.index(t2))]
+        return None
+
+    def _type_name(self, typ):
+        """Convierte un tipo interno a string.
+
+        Básicos:
+            'int' -> 'int'
+
+        Records:
+            ('type_id', 'Point') -> 'Point'
+        """
+        if isinstance(typ, tuple) and typ[0] == 'type_id':
+            return typ[1]
+        return typ
+
+
+    def _type_exists(self, typ):
+        """True si el tipo existe como básico o como record."""
+        name = self._type_name(typ)
+        return name in self.default_types or name in self.records
+
+    def _default_value(self, typ):
+        """Valor por defecto para tipos básicos y records."""
+        name = self._type_name(typ)
+
+        if name in self.default_types:
+            return self.default_types[name]
+
+        if name in self.records:
+            value = {}
+            for field_type, field_name in self.records[name]:
+                value[field_name] = self._default_value(field_type)
+            return value
+
         return None
 
     def _check_binop(self, op, t1, t2):
