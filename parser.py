@@ -152,7 +152,7 @@ class Parser:
         if tail is None:
             # int x;
             if name in self.symbols:
-                print(f"[ERROR SEMÁNTICO] La variable '{name}' ya ha sido declarada previamente")
+                self._semantic_error(f"La variable '{name}' ya ha sido declarada previamente")
             else:
                 self.symbols[name] = (typ, self.default_types.get(typ))
             p[0] = ('decl', typ, [name])
@@ -163,10 +163,12 @@ class Parser:
             expr_typ = expr[0]
 
             if name in self.symbols:
-                print(f"[ERROR SEMÁNTICO] La variable '{name}' ya ha sido declarada previamente")
+                self._semantic_error(f"La variable '{name}' ya ha sido declarada previamente")
             elif not self._compatible(typ, expr_typ):
-                print(f"[ERROR SEMÁNTICO] No se puede inicializar '{name}' (tipo '{typ}') "
-                      f"con una expresión de tipo '{expr_typ}'")
+                self._semantic_error(
+                    f"No se puede inicializar '{name}' (tipo '{typ}') "
+                    f"con una expresión de tipo '{expr_typ}'"
+                )
                 self.symbols[name] = (typ, self.default_types.get(typ))
             else:
                 self.symbols[name] = (typ, expr[1])
@@ -177,7 +179,7 @@ class Parser:
             ids = [name] + tail[1]
             for n in ids:
                 if n in self.symbols:
-                    print(f"[ERROR SEMÁNTICO] La variable '{n}' ya ha sido declarada previamente")
+                    self._semantic_error(f"La variable '{n}' ya ha sido declarada previamente")
                 else:
                     self.symbols[n] = (typ, self.default_types.get(typ))
             p[0] = ('decl', typ, ids)
@@ -214,8 +216,9 @@ class Parser:
 
         if lval_typ is not None and expr_typ is not None:
             if not self._compatible(lval_typ, expr_typ):
-                print(f"[ERROR SEMÁNTICO] No se puede asignar '{expr_typ}' "
-                      f"a variable de tipo '{lval_typ}'")
+                self._semantic_error(
+                    f"No se puede asignar '{expr_typ}' a variable de tipo '{lval_typ}'"
+                )
             else:
                 if lval[0] == 'var' and lval[1] in self.symbols:
                     self.symbols[lval[1]] = (lval_typ, expr[1])
@@ -240,6 +243,10 @@ class Parser:
 
     def p_break_stmt(self, p):
         'break_stmt : BREAK'
+        if self.loop_depth == 0:
+            self._semantic_error(
+                f"'break' solo puede usarse dentro de un bucle (línea {p.lineno(1)})"
+            )
         p[0] = ('break',)
 
     def p_return_stmt_expr(self, p):
@@ -260,33 +267,47 @@ class Parser:
         cond = p[3]   # (tipo, valor)
 
         if cond[0] != 'boolean':
-            print(f"[ERROR SEMÁNTICO] La condición del 'if' debe ser 'boolean', "
-                  f"se encontró '{cond[0]}' (línea {p.lineno(1)})")
+            self._semantic_error(
+                f"La condición del 'if' debe ser 'boolean', "
+                f"se encontró '{cond[0]}' (línea {p.lineno(1)})"
+            )
 
         if len(p) == 6:
             p[0] = ('if', cond, p[5], None)
         else:
             p[0] = ('if', cond, p[5], p[7])
 
+    def p_enter_loop(self, p):
+        'enter_loop :'
+        self.loop_depth += 1
+
+    def p_exit_loop(self, p):
+        'exit_loop :'
+        self.loop_depth -= 1
+
     def p_while_stmt(self, p):
-        'while_stmt : WHILE LPAREN expression RPAREN block'
+        'while_stmt : WHILE LPAREN expression RPAREN enter_loop block exit_loop'
         cond = p[3]   # (tipo, valor)
 
         if cond[0] != 'boolean':
-            print(f"[ERROR SEMÁNTICO] La condición del 'while' debe ser 'boolean', "
-                  f"se encontró '{cond[0]}' (línea {p.lineno(1)})")
+            self._semantic_error(
+                f"La condición del 'while' debe ser 'boolean', "
+                f"se encontró '{cond[0]}' (línea {p.lineno(1)})"
+            )
 
-        p[0] = ('while', cond, p[5])
+        p[0] = ('while', cond, p[6])
 
     def p_do_while_stmt(self, p):
-        'do_while_stmt : DO block WHILE LPAREN expression RPAREN SEMICOLON'
-        cond = p[5]   # (tipo, valor)
+        'do_while_stmt : DO enter_loop block exit_loop WHILE LPAREN expression RPAREN SEMICOLON'
+        cond = p[7]   # (tipo, valor)
 
         if cond[0] != 'boolean':
-            print(f"[ERROR SEMÁNTICO] La condición del 'do-while' debe ser 'boolean', "
-                  f"se encontró '{cond[0]}' (línea {p.lineno(1)})")
+            self._semantic_error(
+                f"La condición del 'do-while' debe ser 'boolean', "
+                f"se encontró '{cond[0]}' (línea {p.lineno(5)})"
+            )
 
-        p[0] = ('do_while', p[2], cond)
+        p[0] = ('do_while', p[3], cond)
 
     # ==================================================================
     # Funciones y records  (semántica completa en P3-parte2)
@@ -376,8 +397,10 @@ class Parser:
         t_res = self._check_binop(op, left[0], right[0])
 
         if t_res is None:
-            print(f"[ERROR SEMÁNTICO] Operación '{op}' no válida entre "
-                  f"'{left[0]}' y '{right[0]}' (línea {p.lineno(2)})")
+            self._semantic_error(
+                f"Operación '{op}' no válida entre "
+                f"'{left[0]}' y '{right[0]}' (línea {p.lineno(2)})"
+            )
             p[0] = (None, None)
         else:
             p[0] = (t_res, None)
@@ -392,8 +415,10 @@ class Parser:
         t_res = self._check_unop(op, expr[0])
 
         if t_res is None:
-            print(f"[ERROR SEMÁNTICO] Operador '{op}' no válido sobre "
-                  f"'{expr[0]}' (línea {p.lineno(1)})")
+            self._semantic_error(
+                f"Operador '{op}' no válido sobre "
+                f"'{expr[0]}' (línea {p.lineno(1)})"
+            )
             p[0] = (None, None)
         else:
             val = None
@@ -499,6 +524,7 @@ class Parser:
     def parse(self, input_text):
         self.has_errors = False
         self.symbols = {}
+        self.loop_depth = 0
         self.lexer.input(input_text)
         return self.parser.parse(
             input=input_text,
@@ -510,6 +536,10 @@ class Parser:
     # ==================================================================
     # Métodos privados de ayuda semántica
     # ==================================================================
+
+    def _semantic_error(self, msg):
+        self.has_errors = True
+        print(f"[ERROR SEMÁNTICO] {msg}")
 
     def _compatible(self, dest, src):
         """True si src puede asignarse a dest (igual o widening permitido)."""
@@ -548,7 +578,9 @@ class Parser:
         if lval[0] == 'var':
             name = lval[1]
             if name not in self.symbols:
-                print(f"[ERROR SEMÁNTICO] La variable '{name}' no ha sido declarada previamente")
+                self._semantic_error(
+                    f"La variable '{name}' no ha sido declarada previamente"
+                )
                 return None
             return self.symbols[name][0]
         elif lval[0] == 'field_access':
