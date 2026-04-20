@@ -10,6 +10,15 @@ def read_file(path: str) -> str:
         return f.read()
 
 
+def remove_semantic_outputs(input_path: str):
+    base_path = os.path.splitext(input_path)[0]
+
+    for ext in (".symbols", ".records", ".functions"):
+        output_path = base_path + ext
+        if os.path.exists(output_path):
+            os.remove(output_path)
+
+
 def token_value_to_text(tok):
     # Prioridad al lexema original si el lexer lo guardó
     if hasattr(tok, "raw"):
@@ -47,6 +56,8 @@ def export_tokens(input_path: str):
 
 
 def run_parser(input_path: str) -> int:
+    remove_semantic_outputs(input_path)
+
     data = read_file(input_path)
     parser = Parser()
     parser.parse(data)
