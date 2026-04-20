@@ -54,6 +54,7 @@ def run_parser(input_path: str) -> int:
     if not parser.has_errors:
         parser.write_symbols_file(input_path)
         parser.write_records_file(input_path)
+        parser.write_functions_file(input_path)
 
     return 1 if parser.has_errors else 0
 

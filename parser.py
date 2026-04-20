@@ -795,6 +795,23 @@ class Parser:
                     value_text = self._format_symbol_value(value)
                     out.write(f"{name}:{typ},{value_text}\n")
 
+    def write_functions_file(self, input_path):
+        output_path = input_path.rsplit('.', 1)[0] + ".functions"
+
+        with open(output_path, "w", encoding="utf-8") as out:
+            for function_name, overloads in self.functions.items():
+                for function in overloads:
+                    params_text = ",".join(
+                        f"{param_name}:{param_type}"
+                        for param_type, param_name in function["params"]
+                    )
+
+                    return_type = function["return"]
+
+                    out.write(
+                        f"{function_name}:[{params_text}],{return_type}\n"
+                    )
+
     # ==================================================================
     # Métodos privados de ayuda semántica
     # ==================================================================
