@@ -198,7 +198,7 @@ class Parser:
                 self.symbols[name] = (typ_name, self._default_value(typ_name))
 
             else:
-                self.symbols[name] = (typ_name, expr[1])
+                self.symbols[name] = (typ_name, self._cast_value_to_type(expr[1], typ_name))
 
             p[0] = ('decl_init', typ_name, name, expr)
 
@@ -254,7 +254,7 @@ class Parser:
                     f"No se puede asignar '{expr_typ}' a variable de tipo '{lval_typ}'"
                 )
             else:
-                self._set_lvalue_value(lval, expr[1])
+                self._set_lvalue_value(lval, self._cast_value_to_type(expr[1], lval_typ))
 
         p[0] = ('assign', lval, expr)
 
@@ -348,6 +348,7 @@ class Parser:
     def p_if_stmt(self, p):
         '''if_stmt : IF LPAREN expression RPAREN block
                    | IF LPAREN expression RPAREN block ELSE block'''
+        self.has_control_or_functions = True
         cond = p[3]   # (tipo, valor)
 
         if cond[0] != 'boolean':
@@ -371,6 +372,7 @@ class Parser:
 
     def p_while_stmt(self, p):
         'while_stmt : WHILE LPAREN expression RPAREN enter_loop block exit_loop'
+        self.has_control_or_functions = True
         cond = p[3]   # (tipo, valor)
 
         if cond[0] != 'boolean':
@@ -383,6 +385,7 @@ class Parser:
 
     def p_do_while_stmt(self, p):
         'do_while_stmt : DO enter_loop block exit_loop WHILE LPAREN expression RPAREN SEMICOLON'
+        self.has_control_or_functions = True
         cond = p[7]   # (tipo, valor)
 
         if cond[0] != 'boolean':
@@ -399,6 +402,7 @@ class Parser:
 
     def p_function_decl(self, p):
         'function_decl : function_header block'
+        self.has_control_or_functions = True
         header = p[1]
         block = p[2]
 
@@ -572,7 +576,9 @@ class Parser:
             )
             p[0] = (None, None)
         else:
-            p[0] = (t_res, None)
+            common_type = self._widen(left[0], right[0])
+            val = self._eval_binop(op, left[1], right[1], common_type, t_res)
+            p[0] = (t_res, val)
 
     def p_expression_unary(self, p):
         '''expression : MINUS expression %prec UMINUS
@@ -740,6 +746,7 @@ class Parser:
         self.loop_depth = 0
         self.function_scope_stack = []
         self.current_function = None
+        self.has_control_or_functions = False
 
         self.lexer.input(input_text)
         return self.parser.parse(
@@ -748,6 +755,45 @@ class Parser:
             tokenfunc=self.lexer.token,
             tracking=True
         )
+
+    # ==================================================================
+    # Escritura de archivos de salida
+    # ==================================================================
+
+    def write_records_file(self, input_path):
+        output_path = input_path.rsplit('.', 1)[0] + ".records"
+
+        with open(output_path, "w", encoding="utf-8") as out:
+            for record_name, fields in self.records.items():
+                fields_text = ",".join(
+                    f"{field_name}:{field_type}"
+                    for field_type, field_name in fields
+                )
+                out.write(f"{record_name}:[{fields_text}]\n")
+
+    def _format_symbol_value(self, value):
+        if isinstance(value, bool):
+            return "true" if value else "false"
+
+        if isinstance(value, dict):
+            fields_text = ",".join(
+                f"{field}:{self._format_symbol_value(field_value)}"
+                for field, field_value in value.items()
+            )
+            return "{" + fields_text + "}"
+
+        return str(value)
+
+    def write_symbols_file(self, input_path):
+        output_path = input_path.rsplit('.', 1)[0] + ".symbols"
+
+        with open(output_path, "w", encoding="utf-8") as out:
+            for name, (typ, value) in self.symbols.items():
+                if self.has_control_or_functions:
+                    out.write(f"{name}:{typ}\n")
+                else:
+                    value_text = self._format_symbol_value(value)
+                    out.write(f"{name}:{typ},{value_text}\n")
 
     # ==================================================================
     # Métodos privados de ayuda semántica
@@ -822,6 +868,83 @@ class Parser:
         if op == '!' and t == 'boolean':
             return 'boolean'
         return None
+
+    def _value_as_type(self, value, target_type):
+        """Convierte un valor al tipo común usado para operar."""
+        if value is None:
+            return None
+
+        target_type = self._type_name(target_type)
+
+        if target_type == 'char':
+            return value
+
+        if target_type == 'int':
+            if isinstance(value, str):
+                return ord(value)
+            return int(value)
+
+        if target_type == 'float':
+            if isinstance(value, str):
+                return float(ord(value))
+            return float(value)
+
+        if target_type == 'boolean':
+            return bool(value)
+
+        return value
+
+
+    def _eval_binop(self, op, left_value, right_value, common_type, result_type):
+        """Evalúa una operación binaria si ambos operandos tienen valor."""
+        if left_value is None or right_value is None or common_type is None:
+            return None
+
+        a = self._value_as_type(left_value, common_type)
+        b = self._value_as_type(right_value, common_type)
+
+        try:
+            if op == '+':
+                result = a + b
+            elif op == '-':
+                result = a - b
+            elif op == '*':
+                result = a * b
+            elif op == '/':
+                if b == 0:
+                    return None
+                if common_type == 'int':
+                    result = a // b
+                else:
+                    result = a / b
+            elif op == '>':
+                return a > b
+            elif op == '>=':
+                return a >= b
+            elif op == '<':
+                return a < b
+            elif op == '<=':
+                return a <= b
+            elif op == '==':
+                return a == b
+            elif op == '&&':
+                return a and b
+            elif op == '||':
+                return a or b
+            else:
+                return None
+
+            if result_type == 'char':
+                if isinstance(result, str):
+                    return result
+                if isinstance(result, int) and 0 <= result <= 255:
+                    return chr(result)
+                return None
+
+            return result
+
+        except Exception:
+            return None
 
     def _lvalue_type(self, lval):
         """Devuelve el tipo de un lvalue.
@@ -1063,3 +1186,28 @@ class Parser:
             f"{arg_types} (línea {line})"
         )
         return None
+
+    def _cast_value_to_type(self, value, target_type):
+        """Convierte un valor al tipo destino para guardarlo en symbols."""
+        if value is None:
+            return None
+
+        target_type = self._type_name(target_type)
+
+        if target_type == 'int':
+            if isinstance(value, str):
+                return ord(value)
+            return int(value)
+
+        if target_type == 'float':
+            if isinstance(value, str):
+                return float(ord(value))
+            return float(value)
+
+        if target_type == 'char':
+            return value
+
+        if target_type == 'boolean':
+            return value
+
+        return value
