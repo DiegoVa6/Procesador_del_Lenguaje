@@ -1,0 +1,35 @@
+// ── input_02_registros.lava ─────────────────────────────────────────────
+// Prueba: declaración de records, instanciación, acceso a campos,
+//         asignación a campos, records anidados y valores por defecto.
+
+record Vector(float x, float y);
+record Planet(Vector position, Vector velocity, float mass, boolean active);
+
+// instanciación directa
+Vector v1 = new Vector(3.0, 4.0);
+Planet earth = new Planet(
+    new Vector(0.0, 0.0),
+    new Vector(1.0, 2.0),
+    5.0,
+    true
+);
+
+// acceso a propiedades simples
+float vx = v1.x;
+float vy = v1.y;
+
+// acceso a propiedades anidadas
+float ex  = earth.position.x;
+float evy = earth.velocity.y;
+float em  = earth.mass;
+
+// asignación a propiedad
+v1.x = 9.0;
+earth.position.x = 100.0;
+earth.active = false;
+
+// variable de record sin inicializar → valores por defecto
+Vector vdefault;
+
+// widening int→float en constructor
+Vector v2 = new Vector(1, 2);

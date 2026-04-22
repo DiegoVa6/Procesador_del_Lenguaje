@@ -1,0 +1,46 @@
+// ── input_06_errores_semanticos.lava ────────────────────────────────────
+// Prueba: todos los errores semánticos del enunciado.
+// Este fichero DEBE producir errores.
+
+// ERR01: variable no declarada
+z = 5;
+
+// ERR02: redeclaración
+int dup = 1;
+int dup = 2;
+
+// ERR03: reasignación tipo incorrecto
+int typed = 1;
+typed = true;
+
+// ERR04: operación inválida (boolean en aritmética)
+int bad = true + 5;
+
+// ERR05: boolean como condición de if → no, int como condición
+int condErr = 1;
+if (condErr) { int inside = 1; }
+
+// ERR06: break fuera de bucle
+break;
+
+// ERR07: return fuera de función
+return 5;
+
+// ERR08: record con tipo de campo inexistente
+record Bad(Inexistente campo, int otro);
+
+// ERR09: campo repetido en record
+record Dup(int x, int x);
+
+// ERR10: constructor con número incorrecto de argumentos
+record P(float x, float y);
+P err1 = new P(1.0);
+
+// ERR11: llamada a función no declarada
+noExiste(1, 2);
+
+// ERR12: char * char no está permitido
+char cErr = 'a' * 'b';
+
+// ERR13: ! sobre int (no booleano)
+boolean notErr = !5;

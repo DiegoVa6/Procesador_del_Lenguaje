@@ -1,0 +1,39 @@
+// ── input_04_tipos_y_widening.lava ──────────────────────────────────────
+// Prueba: tabla de operadores y tipos del enunciado, widening automático.
+
+// char op char → char
+char cc = 'a' + 'b';
+
+// int op int → int
+int ii = 3 * 7;
+
+// float op float → float
+float ff = 1.5 + 2.5;
+
+// char + int → int (widening char→int)
+int ci = 'a' + 1;
+
+// int + float → float (widening int→float)
+float if1 = 2 + 1.5;
+
+// char + float → float (widening char→int→float)
+float cf = 'A' + 1.5;
+
+// comparativas → boolean
+boolean gt  = 10 > 3;
+boolean gte = 3.0 >= 3.0;
+boolean lt  = 'a' < 'z';
+boolean lte = 5 <= 5;
+boolean eq  = 'x' == 'x';
+
+// boolean == boolean
+boolean beq = true == false;
+
+// lógicas
+boolean band = true && false;
+boolean bor  = false || true;
+boolean bnot = !true;
+
+// unarios
+int uminus = -5;
+float uplus = +3.14;

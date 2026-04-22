@@ -1,0 +1,40 @@
+// ── input_03_funciones.lava ─────────────────────────────────────────────
+// Prueba: declaración de funciones, sobrecarga, ámbito de parámetros,
+//         llamadas con widening, función void y tipo de retorno.
+
+// sobrecarga por tipo de parámetro
+float square(float f) {
+    return f * f;
+}
+
+int squareInt(int i) {
+    return i * i;
+}
+
+// función void
+void debugVal(int v) {
+    print(v);
+}
+
+// función con record como parámetro
+record Point(int x, int y);
+record Line(Point a, Point b);
+
+Line makeSegment(int x1, int y1, int x2, int y2) {
+    return new Line(new Point(x1, y1), new Point(x2, y2));
+}
+
+// llamadas
+float d;
+d = 3.7;
+d = square(d);          // square(float f) → exacta
+
+int n = 4;
+int r = squareInt(n);   // squareInt(int i) → exacta
+
+// widening char→float → square(float)
+float rc = square('A');
+
+Line seg = makeSegment(0, 0, 4, 2);
+
+debugVal(r);

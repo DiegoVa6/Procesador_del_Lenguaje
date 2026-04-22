@@ -1,0 +1,41 @@
+// ── input_08_programa_completo.lava ─────────────────────────────────────
+// Prueba exhaustiva: programa completo del enunciado (planeta/energía).
+
+record Vector(float x, float y);
+record Planet(Vector position, Vector velocity, float mass, boolean active);
+
+// función void: actualiza posición con velocidad
+void move(Planet p) {
+    p.position.x = p.position.x + p.velocity.x;
+    p.position.y = p.position.y + p.velocity.y;
+}
+
+// función con retorno float: energía cinética
+float energy(Planet p) {
+    float squareSpeed = p.velocity.x * p.velocity.x + p.velocity.y * p.velocity.y;
+    return 0.5 * p.mass * squareSpeed;
+}
+
+// declaración de instancia
+Planet earth = new Planet(
+    new Vector(0.0, 0.0),
+    new Vector(1.0, 2.0),
+    5.0,
+    true
+);
+
+// bucle con if anidado
+int step = 0;
+while (step < 3) {
+    if (!earth.active) {
+        move(earth);
+    }
+    step = step + 1;
+}
+
+// uso del resultado de función en condición
+if (energy(earth) > 10.0) {
+    print('Y');
+} else {
+    print('N');
+}

@@ -1,0 +1,53 @@
+// ── input_05_control_flujo.lava ─────────────────────────────────────────
+// Prueba: if/else, while, do-while, break y cuartetos de control.
+
+// if-else simple
+int num;
+boolean isPositive;
+if (num >= 0) {
+    isPositive = true;
+} else {
+    isPositive = false;
+}
+
+// while con contador
+int counter;
+float result;
+while (counter < 5) {
+    counter = counter + 1;
+    result = counter;
+    result = -result;
+}
+
+// do-while
+int i = 0;
+do {
+    i = i + 1;
+    print(i);
+} while (i < 3);
+
+// while con break
+int v;
+int steps;
+while (steps < 10) {
+    if (v >= 100) {
+        break;
+    }
+    v = (v + 1) * 2;
+    steps = steps + 1;
+    print(v);
+}
+
+// if anidado
+int x = 5;
+int y = 10;
+boolean nested;
+if (x > 0) {
+    if (y > 5) {
+        nested = true;
+    } else {
+        nested = false;
+    }
+} else {
+    nested = false;
+}

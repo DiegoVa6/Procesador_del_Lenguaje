@@ -1,0 +1,28 @@
+// ── input_07_cuartetos.lava ─────────────────────────────────────────────
+// Prueba: los tres ejemplos exactos del enunciado para cuartetos.
+// Se verifican contra los cuartetos esperados en el enunciado (pág. 19).
+
+// ── Ejemplo 1: expresiones aritméticas ──────────────────────────────────
+float f1, f2;
+boolean b1;
+f1 = 5 * 4 - 80 / 10;
+f2 = 10 / 5 * f1;
+b1 = 5 < 3;
+
+// ── Ejemplo 2: if-else ───────────────────────────────────────────────────
+int num;
+boolean isPositive;
+if (num >= 0) {
+    isPositive = true;
+} else {
+    isPositive = false;
+}
+
+// ── Ejemplo 3: while ─────────────────────────────────────────────────────
+int counter;
+float result;
+while (counter < 5) {
+    counter = counter + 1;
+    result = counter;
+    result = -result;
+}

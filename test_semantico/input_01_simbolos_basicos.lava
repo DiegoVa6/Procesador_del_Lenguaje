@@ -1,0 +1,26 @@
+// ── input_01_simbolos_basicos.lava ──────────────────────────────────────
+// Prueba: tabla de símbolos con tipos básicos, valores calculados,
+//         widening en asignación, reasignación y multideclaración.
+
+int    a = 28;
+float  b = 24.9;
+char   c = 'K';
+boolean flag = true;
+
+// valores calculados
+int suma  = 3 + 5;
+int prod  = 4 * 7;
+float div = 10.0 / 4.0;
+
+// widening int→float y char→float
+float wf1 = 7;
+float wf2 = 'A';
+
+// multideclaración
+int x, y;
+x = 10;
+y = x * x - x;
+
+// reasignación
+a = 99;
+flag = false;
