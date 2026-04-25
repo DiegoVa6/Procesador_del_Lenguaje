@@ -749,12 +749,17 @@ class Parser:
         self.has_control_or_functions = False
 
         self.lexer.input(input_text)
-        return self.parser.parse(
+        result = self.parser.parse(
             input=input_text,
             lexer=self.lexer.lexer,
             tokenfunc=self.lexer.token,
             tracking=True
         )
+
+        if self.lexer.has_errors:
+            self.has_errors = True
+
+        return result
 
     # ==================================================================
     # Escritura de archivos de salida

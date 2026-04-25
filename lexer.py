@@ -5,8 +5,10 @@ class Lexer:
     def __init__(self) -> None:
         self.lexer = lex.lex(module=self)
         self.line_start = 0
+        self.has_errors = False
     
     def input(self, data):
+        self.has_errors = False
         self.line_start = 0
         self.lexer.lineno = 1
         self.lexer.input(data)
@@ -122,7 +124,8 @@ class Lexer:
         t.raw = t.value
         ch = t.value[1]
         if ord(ch) > 255:
-            print(f"ERROR: char fuera de ASCII-extendido en línea {t.lineno}")
+            self.has_errors = True
+            print(f"[ERROR LÉXICO] char fuera de ASCII-extendido en línea {t.lineno}")
             return None
         t.value = ch
         return t
@@ -142,6 +145,7 @@ class Lexer:
         self.line_start = t.lexpos + len(t.value)
 
     def t_error(self, t):
+        self.has_errors = True
         col = t.lexpos - self.line_start
-        print(f"Caracter ilegal '{t.value[0]}' en linea {t.lineno}, columna {col}")
+        print(f"[ERROR LÉXICO] Caracter ilegal '{t.value[0]}' en linea {t.lineno}, columna {col}")
         t.lexer.skip(1)
