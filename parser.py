@@ -671,7 +671,7 @@ class Parser:
                 )
                 value[field_name] = self._default_value(field_type)
             else:
-                value[field_name] = arg_value
+                value[field_name] = self._cast_value_to_type(arg_value, field_type)
 
         p[0] = (record_name, value)
 
