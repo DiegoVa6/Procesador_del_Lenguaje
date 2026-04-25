@@ -1129,6 +1129,8 @@ class Parser:
         """Crea un ámbito local para analizar el cuerpo de una función."""
         self.function_scope_stack.append((self.symbols.copy(), self.current_function))
 
+        self.symbols = self.symbols.copy()
+
         self.current_function = {
             'name': header['name'],
             'return_type': header['return_type'],
@@ -1137,8 +1139,7 @@ class Parser:
         }
 
         for param_type, param_name in header['params']:
-            if param_name not in self.symbols:
-                self.symbols[param_name] = (param_type, self._default_value(param_type))
+            self.symbols[param_name] = (param_type, self._default_value(param_type))
 
     def _exit_function_scope(self):
         """Restaura los símbolos que había antes de entrar en la función."""
