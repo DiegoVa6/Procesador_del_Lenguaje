@@ -24,6 +24,10 @@ dist/
 htmlcov/
 .tox/
 
+# === PLY generated tables ===
+parsetab.py
+parser.out
+
 # === OS junk ===
 .DS_Store
 Thumbs.db
@@ -40,3 +44,6 @@ Thumbs.db
 # input.txt
 input.token
 *.token
+*.symbols
+*.records
+*.functions

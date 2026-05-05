@@ -30,7 +30,7 @@ class Lexer:
         'NEW',
         'RECORD',
         'BREAK'
-    ) # Esta correcto
+    ) # Está correcto
 
     tokens = reserved + (
         # Identificadores y literales
@@ -100,7 +100,7 @@ class Lexer:
 
     def t_FLOAT_VALUE(self, t):
         r'(([1-9][0-9]*|0)(\.[0-9]+)?e[+-]?[0-9]+)|((0|[1-9][0-9]*)\.[0-9]+)'
-        t.raw = t.value # guarda lexema original antse de convertirlo a float
+        t.raw = t.value # guarda lexema original antes de convertirlo a float
         t.value = float(t.value)
         return t
 

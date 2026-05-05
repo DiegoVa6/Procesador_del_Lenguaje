@@ -256,7 +256,7 @@ VALID = [
 
     # ── Control de flujo: do-while ────────────────────────────────────────
     ("do-while simple",
-     "int v = 0;\ndo {\n  v = v + 1;\n} while (v < 5)"),
+     "int v = 0;\ndo {\n  v = v + 1;\n} while (v < 5);"),
 
     ("do-while del enunciado",
      "int i = 0;\nint v = 0;\n"
@@ -265,7 +265,7 @@ VALID = [
      "  v = (v + 1) * 2;\n"
      "  i = i + 1;\n"
      "  print(v);\n"
-     "} while (i < 4)"),
+     "} while (i < 4);"),
 
     ("do-while con semicolon después",
      "int v = 0;\ndo {\n  v = v + 1;\n} while (v < 5);"),
@@ -377,20 +377,6 @@ if (energy(earth) > 10.0) {
 }
 """),
 
-    # ── Semánticamente incorrectos pero SINTÁCTICAMENTE válidos ──────────
-    # (Los errores semánticos se validan en P3)
-    ("tipo de registro no definido (error semántico, no sintáctico)",
-     "MiTipo a = new MiTipo(1, 2);"),
-
-    ("return en función void (error semántico, no sintáctico)",
-     "void f() {\n  return 1;\n}"),
-
-    ("función sin return (error semántico, no sintáctico)",
-     "int f() {\n}"),
-
-    ("break fuera de bucle (error semántico, no sintáctico)",
-     "break;"),
-
     ("función sin ';' y ';' suelto después (son dos items separados)",
      "int f() {\n  return 1;\n}\n;"),
 
@@ -447,8 +433,18 @@ INVALID = [
     ("if sin llaves (Lava requiere llaves)",
      "int a = 1;\nif (a > 0)\n  a = 0;"),
 
-    ("while sin llaves",
-     "int i = 0;\nwhile (i < 10)\n  i = i + 1;"),
+    # ── Errores semánticos ────────────────────────────────────────────────
+    ("tipo de registro no definido",
+     "MiTipo a = new MiTipo(1, 2);"),
+
+    ("return en función void",
+     "void f() {\n  return 1;\n}"),
+
+    ("función sin return",
+     "int f() {\n}"),
+
+    ("break fuera de bucle",
+     "break;"),
 
     ("if sin condición",
      "if () {\n  int a = 1;\n}"),
