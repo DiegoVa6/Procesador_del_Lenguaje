@@ -1,6 +1,6 @@
 """
-run_tests.py — Batería de tests para el parser de Lava (P2)
-Uso: python run_tests.py
+run_parser_extended_tests.py — Batería extendida de tests para Lava
+Uso: python3 run_parser_extended_tests.py
 Coloca este archivo en la misma carpeta que main.py y parser.py.
 """
 

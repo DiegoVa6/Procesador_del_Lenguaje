@@ -95,7 +95,7 @@ python3 run_parser_tests.py
 Tests extendidos del parser:
 
 ```bash
-python3 run_tests_parser.py
+python3 run_parser_extended_tests.py
 ```
 
 Tests semánticos:
@@ -124,7 +124,7 @@ python3 tests_lexer/run_tests.py
 ├── parser.py                # Analizador sintáctico y semántico
 ├── main.py                  # Punto de entrada
 ├── run_parser_tests.py      # Batería de tests del parser
-├── run_tests_parser.py      # Tests adicionales del parser
+├── run_parser_extended_tests.py # Tests adicionales del parser
 ├── test_semantico.py        # Batería de tests semánticos
 ├── tests_lexer/             # Casos de prueba del lexer
 ├── tests_parser/            # Casos válidos e inválidos del parser
